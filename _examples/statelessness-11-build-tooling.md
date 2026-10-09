@@ -35,7 +35,7 @@ until an unreproducible build or a wrong runtime reading costs a day:
   cap; this is the ~30-line helper that reads the *truth* from `cpu.max`.
   Seeing it track the cap while `hardware_concurrency()` doesn't is the
   concrete payoff of every "size to the cgroup" claim in the compendium.
-- **A test gate in the build keeps the helpers honest.** Parsing `cpu.max`,
+- **A test gate in the build catches regressions in the helpers.** Parsing `cpu.max`,
   `memory.max`, and PSI strings has edge cases (unconstrained sentinels,
   trailing newlines, the `full` line that CPU pressure omits). Wiring the
   GoogleTest suite as a *build gate* means a regression in those parsers fails
@@ -125,7 +125,7 @@ Podman 5.x) — the gtest gate, then the same binary under three cap settings:
 - **`in_container()` reading `false` is expected under rootless podman.** See
   the caveat below — it's a known limitation of cgroup-path sniffing, not a
   defect, and it does *not* affect the limit readers, which are the
-  load-bearing path.
+  critical path.
 
 ## Files
 
@@ -153,12 +153,12 @@ Podman 5.x) — the gtest gate, then the same binary under three cap settings:
   pressure files to be exposed to the container. The reader degrades
   gracefully when they're absent — don't treat a missing PSI reading as a
   failure.
-- **The parsers are pure on purpose.** Parsing is separated from file I/O so
+- **The parsers are pure by design.** Parsing is separated from file I/O so
   the tests need no live cgroup. When you extend a parser, add a fixture-string
   test alongside it; that's what keeps the build gate meaningful.
 - **The third helper, `otel_propagator`, is omitted.** Doc 11 lists three
   vendored helpers; the OpenTelemetry propagator needs opentelemetry-cpp, which
-  this tutorial deliberately doesn't pull in. The full Conan profile, library
+  this tutorial doesn't pull in. The full Conan profile, library
   inventory, and toolchain matrix from Doc 11 stay as reference prose on the
   compendium page.
 
@@ -182,7 +182,7 @@ helpers are Conan-free static libraries, GoogleTest comes via Conan as a
 test-only dependency, and the multi-stage Containerfile runs the gtest suite
 as a build gate so a failing parser test fails the image. The third helper the
 doc lists, `otel_propagator`, needs opentelemetry-cpp, which this tutorial
-deliberately doesn't pull in; the full Conan/CMake/toolchain reference material
+doesn't pull in; the full Conan/CMake/toolchain reference material
 stays as prose on the compendium page.
 
 ## Where it sits in the compendium
@@ -190,7 +190,7 @@ stays as prose on the compendium page.
 This is the build that produces every other example in the arc. The
 `cgroup_helper` here is the helper the
 [threading example]({{ '/examples/statelessness-05-threading/' | relative_url }})
-relies on to size pools, and the one the capstone
+relies on to size pools, and the one the end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 uses to size its gRPC server thread pool from the CPU budget. The multi-stage,
 pinned, test-gated build shown here is the pattern every runnable example in

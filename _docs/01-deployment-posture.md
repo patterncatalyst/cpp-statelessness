@@ -51,7 +51,7 @@ Recreate-on-update behaviour is configured to preserve identity.
 
 If none of those apply — the rootfs is `read_only: true`, any writable paths are `tmpfs:` mounts, and the service is scaled via replicas — the deployment is effectively stateless, and any number of replicas can be spun up or down without coordination. Podman doesn't formalize "stateless vs stateful" as separate object types; the posture is the sum of these implicit choices.
 
-There is no Podman analogue to a Kubernetes `StatefulSet`. Podman pods (the OCI/k8s pod concept, supported via `podman pod`) group containers by network namespace but don't add ordinal identity or per-pod persistent volumes. Workloads that genuinely need ordinal identity tend to outgrow podman-compose for production and end up on Kubernetes, where `podman generate kube` is the convenient bridge.
+There is no Podman analogue to a Kubernetes `StatefulSet`. Podman pods (the OCI/k8s pod concept, supported via `podman pod`) group containers by network namespace but don't add ordinal identity or per-pod persistent volumes. Workloads that need ordinal identity tend to outgrow podman-compose for production and end up on Kubernetes, where `podman generate kube` is the convenient bridge.
 
 ### Kubernetes (where it differs)
 
@@ -374,7 +374,7 @@ Use the orchestrator's primitives — environment variables, Podman `--hostname`
 
 Size process-scoped state — connection pools, in-process caches, prepared-statement caches, the PMR upstream resource — as an explicit fraction of the OS container's memory limit. An unbounded `std::unordered_map` reached for by reflex is a future OOM. [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) develops this.
 
-Choose `std::` containers deliberately, not by reflex. `std::vector` with a sized `reserve()` beats `std::deque`/`std::list` in nearly all handler paths. `std::flat_map` (C++23) beats `std::map` for small N. PMR variants beat default-allocator variants for per-request scratch. Docs 03 and 04 develop this.
+Choose `std::` containers for a reason, not by reflex. `std::vector` with a sized `reserve()` beats `std::deque`/`std::list` in nearly all handler paths. `std::flat_map` (C++23) beats `std::map` for small N. PMR variants beat default-allocator variants for per-request scratch. Docs 03 and 04 develop this.
 
 Mind the cost of constructors and destructors in the hot path. RAII is correctness machinery, but the constants matter: trivially-destructible types cost nothing to destroy, PMR-allocated containers reclaim in one arena release rather than N node destructors, and `noexcept` move operations prevent silent copy fallback in standard containers. [Doc 02]({{ '/docs/02-raii/' | relative_url }}) develops this.
 

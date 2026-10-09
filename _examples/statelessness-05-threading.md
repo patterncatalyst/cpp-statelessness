@@ -137,7 +137,7 @@ GCC 14 and Podman 5.x, running the container under `--cpus=2`:
   number tracks the default `cpu.cfs_period_us`. Shortening the period
   reduces individual stalls but raises scheduling overhead; it's rarely the
   right fix — sizing the pool is.
-- **The bench is CPU-bound on purpose.** For an I/O-bound handler the math is
+- **The bench is CPU-bound by design.** For an I/O-bound handler the math is
   different: threads blocked on I/O don't consume quota, so a larger pool can
   help. The lesson is "size from the cgroup," not "always use exactly the
   core count" — match the pool to the workload *and* the budget.
@@ -178,6 +178,6 @@ The `unsynchronized` choice in the
 justified by the threading model here — one thread per request arena. The
 cgroup-aware pool sizing this example demonstrates is exactly what
 [process-scoped state]({{ '/docs/04-process-scoped-state/' | relative_url }})
-uses to size its pools, and what the capstone
+uses to size its pools, and what the end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 applies when it sizes the gRPC server's thread pool from the CPU budget.

@@ -17,7 +17,7 @@ github_path: examples/statelessness/02-raii
 Compendium reference:
 [Doc 02 — RAII as the foundation for safe stateful work]({{ '/docs/02-raii/' | relative_url }})
 
-A deliberately small gRPC service whose only job is to make the
+A small gRPC service whose only job is to make the
 **RequestContext** lifecycle visible. Where compendium Doc 02 explains
 *why* per-request state belongs in one RAII type bound to the handler's
 scope, this example lets you watch it happen — one `acquire` and one
@@ -167,7 +167,7 @@ summarised at the end:
   another exception (the `throw` mode path). This is why the release logic
   never propagates errors — it logs and swallows, which is the correct
   discipline for a destructor.
-- **Move, don't copy.** The type is move-only on purpose. A copy would
+- **Move, don't copy.** The type is move-only. A copy would
   double-release the lease. The moves are `noexcept` so that storing a
   `RequestContext` in a standard container wouldn't silently fall back to
   copies — not needed here, but the right default.
@@ -205,6 +205,6 @@ checkout
 ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}))
 is the real resource the lease stands in for; and graceful shutdown
 ([Doc 09]({{ '/docs/09-health-checks/' | relative_url }}))
-relies on the same reverse-order destruction. The capstone
+relies on the same reverse-order destruction. The end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 composes all of them in one service.

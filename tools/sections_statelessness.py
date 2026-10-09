@@ -74,7 +74,7 @@ SECTIONS = [
     "slides": [
         {
             "kind": "stat-row",
-            "title": "Why statelessness is the load-bearing property",
+            "title": "Why statelessness is the property everything depends on",
             "stats": [
                 ("3", "scopes of state — request, process, deploy-time —\nand only one of them may hold authoritative data",
                  C.ACCENT_BLUE),
@@ -153,14 +153,14 @@ SECTIONS = [
                 bullet("Connection pools, channels, parsed config → process scope, owned in main()"),
                 bullet("Per-request scratch → request scope, the PMR arena"),
                 para("The table is the design exercise: enumerate every piece "
-                     "of state and assign it a scope on purpose.",
+                     "of state and assign it a scope.",
                      size=Pt(15), italic=True, color=C.TEXT_MUTED),
             ],
             "notes": (
                 "The State Architecture Table is the practical heart of the process-scope section, "
                 "introduced here. The exercise is mechanical and clarifying: "
                 "list every piece of state your service touches, and for each "
-                "one decide its scope deliberately. Anything authoritative goes "
+                "one decide its scope. Anything authoritative goes "
                 "to deploy-time scope. Anything that's pure performance "
                 "infrastructure — pools, caches, channels — is process scope, "
                 "bounded and owned in main(). Anything per-request is request "
@@ -190,7 +190,7 @@ SECTIONS = [
                 heading("One RAII type bundles per-request state", color=C.ACCENT_BLUE),
                 bullet("Constructed at the top of the handler; destroyed on return"),
                 bullet("Bundles the deadline, correlation id, a per-request arena, the span scope"),
-                bullet("Members destruct in reverse declaration order — cleanup ordering for free"),
+                bullet("Members destruct in reverse declaration order — cleanup ordering built in"),
                 bullet("The three exception-safety guarantees: basic, strong, nothrow"),
                 para("All cleanup is RAII; the handler's try/catch is for "
                      "error-to-status translation, not resource management.",
@@ -201,7 +201,7 @@ SECTIONS = [
                 "The RequestContext is the single most reused pattern in the "
                 "compendium — it shows up again in the PMR doc (the arena lives "
                 "in it), the threading doc (the span scope is TLS-bound to it), "
-                "and the capstone (the handler builds one per call). The key "
+                "and the end-to-end example (the handler builds one per call). The key "
                 "discipline: the destructor is the contract. You never write "
                 "cleanup code in the handler body; you let scope exit run it."),
         },
@@ -245,7 +245,7 @@ SECTIONS = [
                 bullet("Nothrow — never throws (destructors, swap, moves); the strongest"),
                 bullet("Strong — throws → state unchanged, as if the call never happened"),
                 bullet("Basic — throws → invariants hold, no leaks, but state may have moved"),
-                para("RAII gives you the basic guarantee for free; the strong "
+                para("RAII gives you the basic guarantee automatically; the strong "
                      "guarantee is a design choice (copy-and-swap, build-then-commit).",
                      size=Pt(15), italic=True, color=C.TEXT_MUTED),
             ],
@@ -275,7 +275,7 @@ SECTIONS = [
                 "request, so what you put in it matters. A short std::string "
                 "member fits in the small-string buffer and costs nothing; a "
                 "std::map member allocates per node. This is where the PMR "
-                "arena (next section) earns its keep — the per-request "
+                "arena (next section) pays off — the per-request "
                 "containers allocate from a buffer that's already there."),
         },
         {
@@ -409,7 +409,7 @@ SECTIONS = [
                 "per-element free and bulk arena reclamation, and then the "
                 "deliberate lifetime bug — the demo builds it, runs under ASan, "
                 "and ASan prints the use-after-free with a stack trace. That's "
-                "the safety net the dev profile gives you for free."),
+                "the safety net the dev profile gives you automatically."),
         },
     ],
 },
@@ -435,7 +435,7 @@ SECTIONS = [
                 heading("main() constructs everything by name", color=C.ACCENT_BLUE),
                 bullet("Parsed config, pools, channel cache, caches — built once, in order"),
                 bullet("Injected into services by reference; no global singletons"),
-                bullet("Reverse-order destruction at scope exit — teardown for free from RAII"),
+                bullet("Reverse-order destruction at scope exit — automatic teardown from RAII"),
                 bullet("The State Architecture Table: what's process-scoped vs externalized"),
             ],
             "diagram": dg("04-process-scoped-state"),
@@ -571,7 +571,7 @@ SECTIONS = [
                 "coroutines. After a co_await, the coroutine may resume on a "
                 "different thread, so anything you stashed in TLS before the "
                 "suspension is gone. The fix is to capture request-scoped "
-                "context into the coroutine frame. This is why the capstone's "
+                "context into the coroutine frame. This is why the end-to-end example's "
                 "RequestContext holds the span scope as a member rather than "
                 "relying on TLS."),
         },
@@ -591,7 +591,7 @@ SECTIONS = [
                 "duration, so the server's thread pool size caps your "
                 "concurrency. The ResourceQuota max-threads and the poller "
                 "settings need to be sized from the CPU budget — too few and "
-                "you serialize, too many and you throttle. The capstone shows "
+                "you serialize, too many and you throttle. The end-to-end example shows "
                 "the configuration; this is the knob people miss."),
         },
         {
@@ -662,7 +662,7 @@ SECTIONS = [
     "divider_notes": (
         "The twelve-factor app methodology was written for interpreted, "
         "garbage-collected services. Most factors map onto C++ cleanly; three "
-        "collide with C++ idioms and are worth dwelling on: Config, Processes, "
+        "collide with C++ idioms: Config, Processes, "
         "and Disposability."),
     "slides": [
         {
@@ -1118,7 +1118,7 @@ SECTIONS = [
 {
     "num": 10,
     "label": "§10",
-    "title": "The gRPC capstone",
+    "title": "The gRPC end-to-end example",
     "tagline": "Every pattern composed in one order-pricing service.",
     "divider_notes": (
         "The integration document. The previous nine established patterns in "
@@ -1140,7 +1140,7 @@ SECTIONS = [
             "diagram": dg("10-grpc-microservices"),
             "notes": (
                 "Twelve numbered steps in main(), every one mapping back to a "
-                "prior document. The point of the capstone isn't new ideas — "
+                "prior document. The point of this example isn't new ideas — "
                 "it's showing that the patterns compose without friction. The "
                 "handler reads a customer and product prices from Postgres, "
                 "calls the tax service over gRPC with the request deadline "
@@ -1162,7 +1162,7 @@ SECTIONS = [
                      size=Pt(14), italic=True, color=C.TEXT_MUTED),
             ],
             "notes": (
-                "Honesty slide. The compendium document presents the full "
+                "Scope note. The compendium document presents the full "
                 "design including the OpenTelemetry tracing pipeline. The "
                 "runnable companion stays on the verified gRPC trio and so "
                 "represents some of that design as documented seams rather than "
@@ -1196,7 +1196,7 @@ SECTIONS = [
                 "return 0;  // reverse-order teardown       // 12"
             ),
             "notes": (
-                "The capstone's main() is twelve steps and every one maps to a "
+                "This example's main() is twelve steps and every one maps to a "
                 "prior document — config from 12-factor, CPU budget from threading, "
                 "pools from externalization, the composition root from process scope, the staged "
                 "health flip and signal handling from health & shutdown. The shape is the "
@@ -1226,7 +1226,7 @@ SECTIONS = [
         {
             "kind": "demo-cue",
             "demo_num": 10,
-            "demo_name": "Demo — gRPC capstone",
+            "demo_name": "Demo — gRPC end-to-end example",
             "demo_command": "cd examples/statelessness/10-grpc-microservices && ./demo.sh",
             "demo_description": (
                 "An order-pricing service composing every prior pattern, "

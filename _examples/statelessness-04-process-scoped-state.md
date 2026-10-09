@@ -1,10 +1,10 @@
 ---
 title: "Statelessness 04 — Process-scoped state"
-description: "The runnable companion to compendium Doc 04: the composition root in main(), dependency injection by reference, a bounded LRU cache sized against the cgroup budget, and correct reverse-order teardown for free from RAII."
+description: "The runnable companion to compendium Doc 04: the composition root in main(), dependency injection by reference, a bounded LRU cache sized against the cgroup budget, and correct reverse-order teardown from RAII."
 order: 204
 card_eyebrow: "Compendium · <strong>Doc 04</strong>"
 card_title: "Process-scoped state"
-card_blurb: "The composition root in main(), dependency injection by reference, a bounded LRU cache sized against the cgroup budget, and correct reverse-order teardown for free from RAII."
+card_blurb: "The composition root in main(), dependency injection by reference, a bounded LRU cache sized against the cgroup budget, and correct reverse-order teardown from RAII."
 layout: example
 sectionid: examples
 permalink: /examples/statelessness-04-process-scoped-state/
@@ -61,7 +61,7 @@ order. No Meyers singletons, no hidden construction order.
 `const ServiceConfig&`, `MetricsRegistry&`, and `BoundedCache&` as
 constructor parameters. `main()` owns them; the service borrows them.
 
-**Correct teardown for free.** Dependencies are constructed before their
+**Correct teardown, automatically.** Dependencies are constructed before their
 users, so RAII destroys them in the exact reverse order at exit —
 `server → service → cache → metrics → config` — which is also the correct
 shutdown order (server stops first, then the state it relied on). No manual
@@ -131,7 +131,7 @@ the reverse-order teardown on stop:
 - **Construction order top-down, destruction order bottom-up.** The `[ctor]`
   block and the `[dtor]` block are exact mirrors. That mirroring is the
   whole point: you wrote the order *once*, in `main()`, and RAII gave you
-  the correct teardown for free.
+  the correct teardown automatically.
 - **The cache size never exceeds 4.** Once full, every new distinct key
   evicts the least-recently-used one. The `size=4` that holds steady while
   `evictions` climbs is the bounded-by-construction property — under a
@@ -206,6 +206,6 @@ from, holds the request-scoped work from
 [Doc 03]({{ '/examples/statelessness-03-pmr/' | relative_url }}) at arm's
 length, and is where the real connection pool and channel cache from
 [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})
-get constructed. The capstone
+get constructed. The end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 is one big composition root.

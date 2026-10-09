@@ -263,13 +263,13 @@ Arena `release()` is callable on a `monotonic_buffer_resource` to reclaim all bu
 
 gRPC's callback API includes a hook for per-method memory allocation. The generated code exposes `SetMessageAllocatorFor_<Method>` and `SetContextAllocator` on the server. A user-supplied allocator can satisfy the request, response, and `CallbackServerContext` allocations from a chosen resource.
 
-This is the direct hook for per-RPC PMR. Implementing it well requires a per-method allocator that constructs a fresh arena per call and tears it down when the call finishes; the gRPC proposal `L67-cpp-callback-api.md` covers the interface in detail. [Doc 10 (gRPC capstone)]({{ '/docs/10-grpc-microservices/' | relative_url }}) walks through wiring a per-RPC arena into a complete service.
+This is the direct hook for per-RPC PMR. Implementing it well requires a per-method allocator that constructs a fresh arena per call and tears it down when the call finishes; the gRPC proposal `L67-cpp-callback-api.md` covers the interface in detail. [Doc 10 (gRPC end-to-end example)]({{ '/docs/10-grpc-microservices/' | relative_url }}) walks through wiring a per-RPC arena into a complete service.
 
 The lighter-touch approach — and the one this document leans on — is to leave the protobuf request/response objects on the default allocator and use the request arena only for handler-internal scratch. The overhead of letting protobuf allocate via the global heap is small compared to the wins from arena-allocating intermediate computations. Reach for the per-RPC allocator hook only when profiling shows protobuf allocation as a measurable fraction of handler time.
 
 ## C++23: `std::pmr::stacktrace` and `std::pmr::flat_map`
 
-C++23 added two PMR-related types worth noting.
+C++23 added two PMR-related types.
 
 `std::pmr::stacktrace` is an alias for `std::basic_stacktrace<std::pmr::polymorphic_allocator<std::stacktrace_entry>>`. Captured in a handler with the request arena as the resource, a stacktrace at the point of an error is arena-allocated — no extra cleanup, no extra heap traffic. For services that capture stacks for telemetry (sending them to Tempo or attaching as span attributes), this keeps the diagnostic path arena-local:
 
@@ -288,7 +288,7 @@ GCC 14 and Clang 18 with libc++ support both; [Doc 11 (build tooling)]({{ '/docs
 
 The cppreference example for `monotonic_buffer_resource` shows about a 2–3× speedup on a 200,000-element `std::list<int>` build compared to default `std::list<int>`. That's a real number but it's specific to that workload — high-churn small-object allocation in a single-threaded build phase. Real handlers see anywhere from no improvement (when allocation isn't the bottleneck) to 5–10× on P99 (when default-allocator lock contention is the dominant tail-latency source).
 
-The honest answer is: measure. PMR's biggest practical win is usually the predictability — tail-latency variance shrinks dramatically when per-request heap traffic is constrained to a bounded arena. Mean throughput improvements are smaller and more workload-dependent. The right reason to adopt PMR per-request is the architectural one (request-scope memory bound to request-scope lifetime), with the performance win as confirmation.
+The answer is: measure. PMR's biggest practical win is usually the predictability — tail-latency variance shrinks dramatically when per-request heap traffic is constrained to a bounded arena. Mean throughput improvements are smaller and more workload-dependent. The right reason to adopt PMR per-request is the architectural one (request-scope memory bound to request-scope lifetime), with the performance win as confirmation.
 
 ## Recommendation summary
 

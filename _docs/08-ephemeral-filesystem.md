@@ -94,7 +94,7 @@ The clean mental model has three categories.
 
 The rootfs is read-only. Anything baked into the image at build time lives here: the C++ binary, shared libraries, configuration templates, static assets, the protobuf-compiled descriptors. The runtime never writes to it.
 
-A small tmpfs at `/tmp` (and possibly `/run`) is writable, in-memory, and recycled on restart. Anything genuinely temporary lives here: `std::tmpfile` output, in-flight protobuf serialization buffers when they need to spill, the gRPC channel's name-resolution scratch space, ML model deserialization intermediates. The size is bounded by the tmpfs `size=` parameter; under tight memory budgets, this counts against the container's RSS, so size it sparingly.
+A small tmpfs at `/tmp` (and possibly `/run`) is writable, in-memory, and recycled on restart. Anything temporary lives here: `std::tmpfile` output, in-flight protobuf serialization buffers when they need to spill, the gRPC channel's name-resolution scratch space, ML model deserialization intermediates. The size is bounded by the tmpfs `size=` parameter; under tight memory budgets, this counts against the container's RSS, so size it sparingly.
 
 Persistent volumes mounted at specific paths are writable and survive restarts. Anything stateful that must outlive the container belongs here — a local SQLite database, a downloaded ML model file, a cached compiled regex set. The lifetime is decoupled from the container's; on restart, the new container sees the previous container's writes.
 
@@ -246,15 +246,15 @@ The startup check runs after configuration parsing, before the gRPC server start
 
 The data-loss-on-restart property is sometimes treated as a problem to mitigate. It is usually a property to embrace. A service whose state on disk is recoverable only because the same container instance was running for weeks has accumulated implicit state. A deploy, a node failure, a routine rolling restart will surface that state as missing data.
 
-The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})). The container's writable storage is for genuinely transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
+The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})). The container's writable storage is for transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
 
-The exception is services that genuinely own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Podman, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
+The exception is services that own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Podman, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
 
 ## Recommendation summary
 
 Enable `read_only: true` (Podman compose) or `readOnlyRootFilesystem: true` (Kubernetes) from day one. Treat any write that fails as a bug in the application code, not a configuration to relax.
 
-Mount `/tmp` (and `/run` if needed) as tmpfs, sized explicitly. Anything genuinely temporary goes there.
+Mount `/tmp` (and `/run` if needed) as tmpfs, sized explicitly. Anything temporary goes there.
 
 Mount named volumes only for things that must outlive the container. Be explicit about what those things are; document them.
 
@@ -295,7 +295,7 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **OpenTelemetry C++ SDK documentation, "Logs" section.** The OTel logging exporter is an alternative to spdlog's stdout sink, sending logs directly to an OTLP endpoint. Tighter integration with traces and spans; slightly more complex setup. Either is acceptable.
 
-**"Building Low Latency Applications with C++".** The chapter on persistent state covers the cases where local filesystem persistence is genuinely needed — typically database engines, queue brokers, embedded systems. Useful as the boundary case for when statelessness does not apply.
+**"Building Low Latency Applications with C++".** The chapter on persistent state covers the cases where local filesystem persistence is needed — typically database engines, queue brokers, embedded systems. Useful as the boundary case for when statelessness does not apply.
 
 **Linux kernel documentation on overlayfs, tmpfs, and the various `mount(2)` options.** Background reading for the layer model and the tmpfs sizing.
 

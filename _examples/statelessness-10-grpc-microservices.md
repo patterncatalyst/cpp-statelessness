@@ -1,9 +1,9 @@
 ---
-title: "Statelessness 10 — gRPC microservices (capstone)"
+title: "Statelessness 10 — gRPC microservices (end-to-end example)"
 description: "The runnable companion to compendium Doc 10: an order-pricing gRPC service that composes every prior pattern — Config parsed once, process-scoped PgPool and channel cache, a per-request RAII bundle with a PMR arena, deadline-propagating PostgreSQL and outbound-gRPC helpers, idempotency, and the staged health/graceful-shutdown sequence — calling a second tax service over gRPC end to end."
 order: 211
 card_eyebrow: "Compendium · <strong>Doc 10</strong>"
-card_title: "gRPC microservices (capstone)"
+card_title: "gRPC microservices (end-to-end example)"
 card_blurb: "The integration example: an order-pricing service composing every prior pattern — Config, process-scoped pools and a channel cache, a per-request PMR arena, deadline-propagated PostgreSQL and an outbound gRPC tax call, idempotency, and the staged health/shutdown sequence."
 layout: example
 sectionid: examples
@@ -29,7 +29,7 @@ propagated through every downstream call.
 
 Each prior example proved a pattern alone. The real question — the one a team
 actually faces — is whether those patterns *compose* without fighting each
-other, and this capstone answers it:
+other, and this example answers it:
 
 - **Composition is where abstractions leak.** RAII request scope, a PMR
   arena, process-scoped pools, deadline propagation, idempotency, and
@@ -41,7 +41,7 @@ other, and this capstone answers it:
   another service.
 - **This is the shape every service in the stack takes.** The twelve-step
   `main()` and the throw-and-translate handler are reusable; new services
-  swap the business logic and keep the wiring. The capstone is the template.
+  swap the business logic and keep the wiring. This is the template.
 
 ## What it composes
 
@@ -128,11 +128,11 @@ the three acts, with the real figures from the seeded data:
   replica.
 - **`SERVING` only after migrate.** The startup line shows both services
   reach `SERVING` after their staged warm-up — the health sequence from the
-  health-checks example, running in the capstone's `main()`.
+  health-checks example, running in this example's `main()`.
 
 ## Files
 
-- `src/pricing_svc.cpp` — the capstone: the handler, the deadline-propagating
+- `src/pricing_svc.cpp` — the end-to-end example: the handler, the deadline-propagating
   helpers, and the twelve-step `main()`
 - `src/tax_svc.cpp` — the outbound tax upstream (the second service)
 - `src/request_context.hpp` — per-request RAII bundle + real PMR arena (the
@@ -142,7 +142,7 @@ the three acts, with the real figures from the seeded data:
 - `src/config.hpp` — env-time `Config`
 - `src/pricing_client.cpp` — drives `PriceOrder` for the demo
 - `src/health_probe.cpp` — the minimal hermetic `grpc_health_probe`
-- `proto/{pricing,tax,health}.proto` — the capstone API, the upstream, and
+- `proto/{pricing,tax,health}.proto` — the example's API, the upstream, and
   the standard health protocol
 - `CMakeLists.txt` — codegen 3 protos; build 4 binaries
 - `conanfile.py` — the gRPC trio (libpq is system)

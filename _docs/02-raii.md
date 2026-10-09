@@ -43,7 +43,7 @@ In a request handler, the practical target is the basic guarantee everywhere, th
 
 > **Opinion.** A handler that doesn't think clearly about which guarantee it offers will accidentally offer "none." Pick one explicitly per operation, and let the type system enforce it. Most handlers can target the basic guarantee throughout; reach for the strong guarantee only where authoritative external state is being changed.
 
-RAII gives the basic guarantee for free: any resource owned by an RAII object is released on scope exit, exception or not. The strong guarantee requires more — typically a copy-then-swap pattern or transactional database semantics. The no-throw guarantee for destructors is essentially required by the language: if a destructor throws while another exception is propagating, `std::terminate` is called and the process dies.
+RAII gives the basic guarantee automatically: any resource owned by an RAII object is released on scope exit, exception or not. The strong guarantee requires more — typically a copy-then-swap pattern or transactional database semantics. The no-throw guarantee for destructors is essentially required by the language: if a destructor throws while another exception is propagating, `std::terminate` is called and the process dies.
 
 ## The gRPC request boundary
 
@@ -201,7 +201,7 @@ return result;                      // ScopedConnection destructs on return
 
 The mechanical pattern is: every resource has an owning RAII type; acquisition is via constructor or named factory that returns the owning type; release is via destructor. No `try`/`catch` for cleanup, only for error handling.
 
-**Forgetting `noexcept` on move operations.** Standard containers like `std::vector` examine `std::is_nothrow_move_constructible_v<T>` to decide whether to move or copy on reallocation. If `T`'s move constructor is not `noexcept`, the vector copies on reallocation — a silent and substantial performance loss. Mark move constructors and move assignment `noexcept` unless they genuinely can throw.
+**Forgetting `noexcept` on move operations.** Standard containers like `std::vector` examine `std::is_nothrow_move_constructible_v<T>` to decide whether to move or copy on reallocation. If `T`'s move constructor is not `noexcept`, the vector copies on reallocation — a silent and substantial performance loss. Mark move constructors and move assignment `noexcept` unless they can throw.
 
 ## A counterexample worth recognizing
 
@@ -282,17 +282,17 @@ RAII is correctness machinery, but in a hot path running billions of times the c
 
 **`noexcept` on moves is not optional.** `std::vector` reallocates by examining `std::is_nothrow_move_constructible_v<T>`. If true, it moves; if false, it copies. A type with an unmarked move loses move semantics inside `std::vector`. For per-request scratch types (request models, intermediate result structs, error contexts), making move ops `noexcept` is essentially mandatory for performance under reallocation. The same gotcha applies to `std::deque` (less commonly) and to algorithms that internally relocate via `std::move_if_noexcept`.
 
-**Trivial destructibility compiles to nothing.** A type satisfying `std::is_trivially_destructible_v<T>` has its destructor optimized out entirely. Aggregates of trivial types — POD-style request models — get this for free. Adding a `std::string` member loses it; adding a `std::unique_ptr<T>` member loses it. For per-request scratch structures, prefer designs that stay trivially destructible where possible: use `std::span` views into the arena instead of `std::string` copies, use index handles into arena-backed vectors instead of pointers.
+**Trivial destructibility compiles to nothing.** A type satisfying `std::is_trivially_destructible_v<T>` has its destructor optimized out entirely. Aggregates of trivial types — POD-style request models — keep this property automatically. Adding a `std::string` member loses it; adding a `std::unique_ptr<T>` member loses it. For per-request scratch structures, prefer designs that stay trivially destructible where possible: use `std::span` views into the arena instead of `std::string` copies, use index handles into arena-backed vectors instead of pointers.
 
 **Allocator awareness is a per-type choice.** Default-allocator `std::string` and `std::vector` in a handler hit the global heap, which means lock contention in the malloc arena, fragmentation across thread arenas, and unpredictable tail latency from page faults and arena rebalancing. Allocator-aware variants (PMR or custom) move the allocation budget into a place you can reason about per request. The choice is per-type and per-call-site: a long-lived `std::string` in a process-scoped cache map doesn't need PMR; a transient `std::string` in a handler does.
 
 > **Opinion.** The single most useful refactor in a hot-path handler is: identify the largest transient structure, replace its default allocator with a PMR one backed by the request arena, and measure. The result is usually a measurable P99 improvement and a quieter heap profile. [Doc 03]({{ '/docs/03-pmr/' | relative_url }}) develops the technique end-to-end.
 
-## C++23 improvements worth noting
+## C++23 improvements
 
 Two C++23 additions specifically improve the RAII discipline in a service.
 
-`std::expected<T, E>` gives a value-or-error return type without exceptions. For handler-internal flow where errors are expected — validation failures, cache misses, retryable timeouts — this composes more cleanly than exception unwinding and is friendlier to the cost model of RAII destruction. The exception path still exists for genuinely exceptional cases (OOM, programmer errors); `std::expected` is for the common-but-failing path.
+`std::expected<T, E>` gives a value-or-error return type without exceptions. For handler-internal flow where errors are expected — validation failures, cache misses, retryable timeouts — this composes more cleanly than exception unwinding and is friendlier to the cost model of RAII destruction. The exception path still exists for exceptional cases (OOM, programmer errors); `std::expected` is for the common-but-failing path.
 
 ```cpp
 std::expected<UserProfile, ErrorCode>
@@ -317,13 +317,13 @@ Every per-request resource gets an RAII owner. No raw `new`/`delete`. No raw `po
 
 Bundle per-request state into a `RequestContext`-like type whose destruction order matches the conceptual unwind order: TLS scopes first, then spans, then arena, then everything else.
 
-Mark destructors `noexcept` — which is the default, but the explicit marker documents intent. Mark move constructors and move assignment `noexcept` unless they genuinely throw. The cost of getting this wrong is silent copy fallback in standard containers, which is hard to spot in code review and easy to see in a flamegraph.
+Mark destructors `noexcept` — which is the default, but the explicit marker documents intent. Mark move constructors and move assignment `noexcept` unless they throw. The cost of getting this wrong is silent copy fallback in standard containers, which is hard to spot in code review and easy to see in a flamegraph.
 
 Prefer trivially destructible types for per-request scratch. Use `std::span` and `std::string_view` into arena-backed storage instead of copies where ownership isn't needed.
 
 When a handler builds a large transient structure (parsed input, intermediate results, a lookup map), allocate it via PMR with the request arena as the resource. The destruction asymmetry is the win, not the allocation speed.
 
-Reach for `std::expected<T, E>` (C++23) for the expected-failure paths inside a handler; keep exceptions for genuinely exceptional cases.
+Reach for `std::expected<T, E>` (C++23) for the expected-failure paths inside a handler; keep exceptions for exceptional cases.
 
 ## Cross-references
 

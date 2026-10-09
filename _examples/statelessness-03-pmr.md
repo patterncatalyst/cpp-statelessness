@@ -52,7 +52,7 @@ up. Under a container this matters twice over:
 `unsynchronized_pool_resource` that recycles size-classed blocks, over
 `new_delete_resource`. The whole arena releases together when it leaves
 scope — no per-object destructor walk for trivially-destructible scratch.
-The type is deliberately **non-movable**: the monotonic resource holds a
+The type is **non-movable**: the monotonic resource holds a
 pointer into the arena's own buffer, so moving it would dangle that
 pointer.
 
@@ -130,7 +130,7 @@ READ of size 1 at 0x... thread T0
   allocator is fast. The durable win is the *tail*: under contention and at
   larger N the arena's variance is far lower. Don't treat a close wall-clock
   race as a failure of PMR.
-- **The ASan trap exits nonzero on purpose.** The `heap-use-after-free`
+- **The ASan trap exits nonzero by design.** The `heap-use-after-free`
   report with a nonzero exit code is the success condition for that step.
   A clean exit there would mean the trap *didn't* fire — which under ASan
   would itself be the surprise.
@@ -157,7 +157,7 @@ READ of size 1 at 0x... thread T0
 
 ## Caveats and gotchas
 
-- **The arena is non-movable on purpose.** The monotonic resource holds a
+- **The arena is non-movable by design.** The monotonic resource holds a
   pointer into the arena object's own buffer; a move would leave that
   pointer dangling. Don't add move operations to make it fit in a container
   — keep it pinned where it lives (in the `RequestContext`, on the stack).
@@ -200,6 +200,6 @@ threading rules behind the `unsynchronized` choice are in
 and the cache fix for the lifetime trap — a cache that *owns* its entries —
 is in
 [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
-The capstone
+The end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 carries this exact arena as a `RequestContext` member.

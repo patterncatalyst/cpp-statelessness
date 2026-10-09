@@ -1,8 +1,18 @@
 source "https://rubygems.org"
 
-# GitHub Pages bundle keeps everything Pages-compatible in one go.
-# https://pages.github.com/versions/
-gem "github-pages", group: :jekyll_plugins
+# The site deploys via its own `jekyll build` + actions/deploy-pages step
+# (see .github/workflows/pages.yml), not GitHub's legacy auto-build, so it
+# does not need the `github-pages` meta-gem's strict version pins. Those
+# pins (Jekyll 3.9 / Liquid 4.0.3) call Ruby's removed String#tainted? and
+# cannot install or run on current Ruby. Plain jekyll + the same plugins
+# the meta-gem bundled gives the same output without the pin.
+gem "jekyll", "~> 4.3"
+
+# Ruby 3.4+ dropped these from the default gems; jekyll/webrick still need them.
+gem "csv"
+gem "bigdecimal"
+gem "base64"
+gem "logger"
 
 group :jekyll_plugins do
   gem "jekyll-feed"

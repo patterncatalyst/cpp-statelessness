@@ -57,7 +57,7 @@ For specific problems, the scenario guide below jumps to the relevant document.
 
 **[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) — Health checks as the public API of statelessness.** The orchestrator's API into the service. The three probes (startup, liveness, readiness) and what each means. The gRPC standard health protocol with the `HealthCheckServiceInterface` C++ API. Separate-port vs same-port trade-offs. The graceful-shutdown sequence that ties together `std::stop_token` ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), pool draining ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})), and reverse-order destruction ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})). Health-check anti-patterns.
 
-**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) — Microservices with gRPC and C++.** The capstone integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `podman-compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
+**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) — Microservices with gRPC and C++.** The end-to-end integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `podman-compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
 
 **[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) — Build tooling appendix.** Conan 2.x setup with version-pinned dependencies, dev and release profiles (AddressSanitizer in dev, LTO + hardening in release), CMake structure with proto codegen, the C++23 feature support table (GCC 14+ for `<stacktrace>` and `std::pmr::stacktrace`, GCC 15+ for `std::flat_map`), standard-library choice (libstdc++ vs libc++), multi-stage Containerfile pattern, full source for the vendored helpers (`cgroup_helper`, `psi_reader`, `otel_propagator`), test infrastructure, common gotchas.
 
@@ -90,7 +90,7 @@ Reproduced from [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) 
 | `thread_local` storage | ✓ | — | — |
 | Thread pool, executor, fiber scheduler | ✓ | — | — |
 
-The bottom two rows on threading state are worth highlighting: `thread_local` looks request-scoped to a developer reading the code, and it is one of the most common silent-bug sources. The `CorrelationGuard` pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}) puts a `thread_local` write inside an RAII type whose scope is the handler, which is the legitimate way to use TLS in a request handler.
+The bottom two rows on threading state stand out: `thread_local` looks request-scoped to a developer reading the code, and it is one of the most common silent-bug sources. The `CorrelationGuard` pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}) puts a `thread_local` write inside an RAII type whose scope is the handler, which is the legitimate way to use TLS in a request handler.
 
 ## Cross-cutting themes
 
@@ -156,7 +156,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 ## Out of scope
 
-A few topics the compendium deliberately doesn't cover. They're worth flagging so the reader knows the boundary.
+A few topics the compendium does not cover — the list below marks the boundary.
 
 **Non-gRPC transports.** HTTP/REST via Drogon, Crow, or restbed; GraphQL via cppgraphqlgen; raw socket protocols. The patterns transfer but the specific API surfaces differ.
 

@@ -197,6 +197,6 @@ owns in `main()`; the RAII checkout is the
 applied to a network resource; and the owned-result pattern is the fix for
 the [PMR lifetime trap]({{ '/examples/statelessness-03-pmr/' | relative_url }}).
 The [outbox example]({{ '/examples/statelessness-07-outbox-pattern/' | relative_url }})
-extends this with atomic event emission, and the capstone
+extends this with atomic event emission, and the end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 reuses this exact `pg_pool.hpp`.

@@ -91,7 +91,7 @@ CI verification: `scripts/test-stateless-demo-07-outbox-pattern.sh`.
 
 Representative output on a Fedora 44 host with Podman 5.x — a create that
 writes order + outbox atomically, the relay publishing it, the consumer
-applying it, then a deliberately duplicated event being deduped:
+applying it, then a duplicate event being deduped:
 
 ```
 ==> act 1: CreateOrder  key=ord-xyz-001
@@ -191,6 +191,6 @@ The outbox builds directly on
 [state externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }}) —
 same `pg_pool.hpp`, same `ON CONFLICT` idempotency — and extends it with
 atomic event emission. The idempotent-consumer discipline is the same
-authoritative-dedup idea the capstone
+authoritative-dedup idea the end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 applies to its idempotency store.

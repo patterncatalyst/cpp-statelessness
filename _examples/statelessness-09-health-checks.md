@@ -201,6 +201,6 @@ cancellation and the
 reverse-order teardown. The staged-startup gate is the answer to the cold-start
 trap from
 [12-factor]({{ '/docs/06-twelve-factor/' | relative_url }}).
-The capstone
+The end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 reuses this exact health/shutdown sequence and the `health-probe` binary.

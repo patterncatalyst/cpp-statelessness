@@ -1,6 +1,6 @@
 ---
-title: Microservices with gRPC and C++ (capstone)
-description: "The capstone integration. A realistic order-pricing service skeleton: proto, Config, RequestContext, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete main() with twelve cross-referenced steps, full podman-compose.yaml, full Kubernetes manifest. Every prior pattern in one place."
+title: Microservices with gRPC and C++ (end-to-end example)
+description: "The end-to-end integration. A realistic order-pricing service skeleton: proto, Config, RequestContext, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete main() with twelve cross-referenced steps, full podman-compose.yaml, full Kubernetes manifest. Every prior pattern in one place."
 order: 10
 layout: tutorial
 sectionid: docs
@@ -17,7 +17,7 @@ The shape: a service proto, a `Config` struct, a `RequestContext` type, a proces
 
 This document is heavier on code than the others by design. The point is to make the integration concrete, not to develop new ideas. Each block points back to the document that develops its pattern in detail.
 
-{% include excalidraw.html name="statelessness/10-grpc-microservices" caption="gRPC capstone: a complete order-pricing service composing process-, request-, and external-scope state." %}
+{% include excalidraw.html name="statelessness/10-grpc-microservices" caption="gRPC end-to-end example: a complete order-pricing service composing process-, request-, and external-scope state." %}
 
 > **Run this pattern.** A runnable companion lives at
 > [`examples/statelessness/10-grpc-microservices/`]({{ '/examples/statelessness-10-grpc-microservices/' | relative_url }}).
@@ -55,7 +55,7 @@ This document is heavier on code than the others by design. The point is to make
 
 ## The example service
 
-{% include excalidraw.html name="08-deadline-budget-flow" caption="Deadline budget propagation through the capstone: the inbound deadline is spent across the PostgreSQL lookups and the outbound tax-service gRPC call, each budgeting against the time remaining." %}
+{% include excalidraw.html name="08-deadline-budget-flow" caption="Deadline budget propagation through the end-to-end example: the inbound deadline is spent across the PostgreSQL lookups and the outbound tax-service gRPC call, each budgeting against the time remaining." %}
 
 Take an order-pricing service. It accepts an order specification — customer ID and a list of line items — looks up customer metadata from PostgreSQL, fetches product prices from Redis (with cache-miss falling through to PostgreSQL), calls a tax-calculation service via gRPC, and returns a fully priced order. It supports idempotency via a client-supplied key, propagates deadlines through every downstream call, and exposes the standard gRPC health protocol.
 

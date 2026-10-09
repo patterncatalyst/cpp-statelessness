@@ -170,7 +170,7 @@ Brief notes on each library — what it's for, what version is current, what to 
 
 **boost** is used primarily for Asio ([Doc 05]({{ '/docs/05-threading/' | relative_url }})) and optionally for Fiber ([Doc 05]({{ '/docs/05-threading/' | relative_url }})). Build with `shared: False` to embed in the binary; build `without_python` to avoid pulling in Python dependencies that aren't needed.
 
-**asio-grpc** is the coroutine bridge between gRPC's `CompletionQueue` and Boost.Asio's executor model ([Doc 05]({{ '/docs/05-threading/' | relative_url }}), [Doc 10 (gRPC capstone)]({{ '/docs/10-grpc-microservices/' | relative_url }})). Header-only; pulled in via Conan's CMake find_package generation.
+**asio-grpc** is the coroutine bridge between gRPC's `CompletionQueue` and Boost.Asio's executor model ([Doc 05]({{ '/docs/05-threading/' | relative_url }}), [Doc 10 (gRPC end-to-end example)]({{ '/docs/10-grpc-microservices/' | relative_url }})). Header-only; pulled in via Conan's CMake find_package generation.
 
 **nlohmann_json** is the standard JSON library for C++. Used for parsing configuration files that don't fit in env vars (rare, but useful for complex policies). Also useful for structured logging if spdlog's built-in patterns are insufficient.
 

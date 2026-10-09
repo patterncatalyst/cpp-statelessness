@@ -29,7 +29,7 @@ Eleven observations recurred across topics and should be threaded through the do
 
 1. **The orchestrator's view of "state" is different from the language's view of "state."** Podman/podman-compose (the project's primary stack) and Kubernetes both decide "stateless" by where data lives across restart: named volumes, bind mounts, tmpfs, ephemeral overlay. Kubernetes formalizes the distinction further via Deployment vs StatefulSet. None of that is enforced by C++. A binary with mutable globals, an on-disk cache, and a process-local session table can still be run as a stateless service if those globals don't survive restart in a way clients depend on. This is the single most important framing of the project.
 
-2. **Podman is primary; Kubernetes is noted where it differs.** Examples and `compose.yaml` snippets target podman-compose. Kubernetes differences are flagged inline when they meaningfully change the picture — probes (richer model vs Podman's `HEALTHCHECK`), Deployment vs StatefulSet (no real Podman analogue), ConfigMaps/Secrets (compose `env_file` and bind-mounts are the rough equivalent), and resource requests/limits (Podman uses `--cpus`, `--memory` and compose `deploy.resources`, Kubernetes uses `resources.requests`/`limits`). `podman generate kube` is the bridge worth mentioning when relevant.
+2. **Podman is primary; Kubernetes is noted where it differs.** Examples and `compose.yaml` snippets target podman-compose. Kubernetes differences are flagged inline when they meaningfully change the picture — probes (richer model vs Podman's `HEALTHCHECK`), Deployment vs StatefulSet (no real Podman analogue), ConfigMaps/Secrets (compose `env_file` and bind-mounts are the rough equivalent), and resource requests/limits (Podman uses `--cpus`, `--memory` and compose `deploy.resources`, Kubernetes uses `resources.requests`/`limits`). `podman generate kube` bridges the two when relevant.
 
 3. **Request-scoped vs process-scoped state is the practical seam.** Everything operational in a C++ service slots into one or the other, and RAII is what enforces the seam cleanly. Per-request arenas (PMR), per-request span contexts, per-request DB transactions, per-request gRPC ServerContext — all destruction-on-scope-exit. Process-scoped things — channel caches, tracer providers, allocator pools — must be re-buildable from configuration on every cold start without correctness loss.
 
@@ -108,7 +108,7 @@ This is the angle the brief asked for explicitly. RAII is correctness machinery,
 - **Constructor cost.** Each per-request RAII object pays its constructor on entry. Heap allocations inside that ctor (e.g., `std::string` over default allocator, `std::vector` reserving on the heap) dominate. Mitigations: SBO-friendly types (small `std::string` instances stay on the stack on most libstdc++/libc++ implementations up to ~15-22 bytes), `reserve()` with a known cap to avoid mid-handler reallocation, PMR allocators backed by a per-request arena (Doc 03), and `std::array`/`std::span` where the size is fixed.
 - **Destructor cost.** Destructors run in reverse order at scope exit. A `std::unordered_map` with 100k entries destroys all of them individually; a PMR-backed map over a `monotonic_buffer_resource` is reclaimed by one arena `release()` regardless of entry count. The cost asymmetry is a major argument for PMR in handlers that build large transient structures.
 - **`noexcept` and exception paths.** Destructors should be `noexcept` (the default) and not throw. Marking move operations `noexcept` lets `std::vector` use moves instead of copies during reallocation — a frequent invisible cost. Yonts covers the common mistakes; the practical rule is `noexcept` everything in the move and destruction path.
-- **Trivial destructibility.** Types that are trivially destructible cost nothing to destroy. Aggregates of trivial types (POD-style `struct`s) get this for free; classes with `std::string` members or `std::vector` members lose it. For per-request scratch structures, prefer designs that stay trivially destructible where possible.
+- **Trivial destructibility.** Types that are trivially destructible cost nothing to destroy. Aggregates of trivial types (POD-style `struct`s) keep this property automatically; classes with `std::string` members or `std::vector` members lose it. For per-request scratch structures, prefer designs that stay trivially destructible where possible.
 - **Allocator awareness vs allocation churn.** Default-allocator `std::string` and `std::vector` in a handler hit the global heap, which means: lock contention in glibc malloc, fragmentation across thread arenas, and unpredictable tail latency. Allocator-aware variants (PMR or custom) move the allocation budget into a place you can reason about per request.
 - **Move semantics across scope boundaries.** When a per-request object needs to outlive its construction scope (e.g., handed to an async continuation), move is correct; copy is rarely correct. `noexcept` moves prevent silent copy fallback in standard containers.
 
@@ -168,7 +168,7 @@ PMR is the gateway to making `std::` container choices that actually serve a req
 - `std::pmr::vector<T>` over arena: bump-allocated on push_back until the arena is exhausted; geometric reallocation moves still happen, but the freed blocks stay in the arena (no-op deallocate). Reserve to the expected size on construction to avoid reallocations entirely.
 - `std::pmr::string`: small-string optimization still applies on most implementations; only longer strings hit the arena.
 - `std::pmr::unordered_map`: each node allocates from the arena; lookup/insert cost is unchanged, but destruction is one arena release instead of N node destructors. Big win when handlers build large transient maps.
-- `std::pmr::flat_map` (C++23 in `<flat_map>`): backed by a single `std::pmr::vector`, much better cache behaviour than `unordered_map` for small N (< ~64). Worth mentioning in the doc as a modern alternative.
+- `std::pmr::flat_map` (C++23 in `<flat_map>`): backed by a single `std::pmr::vector`, much better cache behaviour than `unordered_map` for small N (< ~64) — a modern alternative to the classic maps.
 - `std::array` / `std::span` for fixed-size scratch: zero allocation, trivially destructible, perfect for known-size intermediate results.
 - `std::pmr::deque`, `std::pmr::list`: rarely the right choice in handlers; mention only as anti-recommendation.
 
@@ -228,7 +228,7 @@ Process-scoped `std::` containers (LRU caches, channel maps, prepared-statement 
 
 - Use `reserve()` aggressively on `vector`/`unordered_map` at construction so growth doesn't surprise you.
 - Bound any unbounded structure. An `unordered_map<UserId, SessionInfo>` that grows without eviction is an OOM crash waiting for one bad day's traffic.
-- Choose container types deliberately: `std::flat_map` (C++23) for small N (< ~64) with rare insertion; `std::unordered_map` for larger N; consider Abseil's `flat_hash_map` for pointer-stable iteration with better density (mention as third-party option).
+- Match container choice to N: `std::flat_map` (C++23) for small N (< ~64) with rare insertion; `std::unordered_map` for larger N; consider Abseil's `flat_hash_map` for pointer-stable iteration with better density (mention as third-party option).
 - For caches: prefer libraries with explicit memory budgets (e.g., a fixed-size ring or a third-party LRU with a byte budget) over `unordered_map` plus ad-hoc eviction.
 
 ### Book references
@@ -448,7 +448,7 @@ The user's brief flagged this as "no existing source treats it well." The 12-fac
 
 1. **Config (Factor III): "Store config in env vars."** Maps cleanly in dynamic languages: read env at startup, use it. In C++: env reads are easy (`std::getenv`), but the deeper question is *compile-time vs runtime config*. Templates, `if constexpr`, `consteval`, link-time selection of allocator/exception model — these are config that's baked at build time, not env-time. The 12-factor canon doesn't have a vocabulary for this. The right framing: 12-factor's "config" means *deploy-varying* config, and the C++ design choice is which slice of config lives where (compile-time, link-time, env-time, runtime-fetched from a config service).
 2. **Processes (Factor VI) + the singleton problem.** Meyers singleton is thread-safe-init since C++11, but: (a) every call path that hits `getInstance()` pays an atomic flag check after init, (b) the instance lives until process exit, (c) it's notoriously hard to test, (d) it makes dependency wiring implicit. 12-factor "stateless processes" plays badly with codebases full of singletons. The modern alternative is explicit dependency injection — pass dependencies as constructor args from `main()`. Iglberger covers this in the DI chapter.
-3. **Disposability (Factor IX): "Fast startup, graceful shutdown."** C++ has a startup tax other languages don't: static initialization (especially the SIOF), library-level constructors in shared libs, dynamic loader work for many `.so` deps. Each global ctor that calls into `malloc` or opens a file or contacts a server adds to cold-start latency, which Kubernetes measures via `startupProbe` and which affects the SLO around rolling restarts. The remedy is the same as the singleton remedy: prefer explicit `main()`-owned objects over file-scope statics; use `constinit` for things that genuinely need to be globally available before `main`.
+3. **Disposability (Factor IX): "Fast startup, graceful shutdown."** C++ has a startup tax other languages don't: static initialization (especially the SIOF), library-level constructors in shared libs, dynamic loader work for many `.so` deps. Each global ctor that calls into `malloc` or opens a file or contacts a server adds to cold-start latency, which Kubernetes measures via `startupProbe` and which affects the SLO around rolling restarts. The remedy is the same as the singleton remedy: prefer explicit `main()`-owned objects over file-scope statics; use `constinit` for things that need to be globally available before `main`.
 
 ### Key findings
 
@@ -460,7 +460,7 @@ The user's brief flagged this as "no existing source treats it well." The 12-fac
 ### Code-pattern anchors
 
 - A `Config` struct populated in `main()` from env vars and CLI flags, passed by const reference to constructors of `TracerProviderHolder`, `ChannelCache`, `RedisPool`, etc. No globals.
-- A `constinit` example for genuinely-required-before-main constants.
+- A `constinit` example for required-before-main constants.
 - A counterexample: a `Logger::instance()` Meyers singleton called from a destructor of another global → SIOF-adjacent UB.
 - Build-time vs runtime config: a `policy<T>` template parameter for the allocation strategy chosen at build, plus an env-var-set buffer size for runtime — same service, two config dimensions.
 
@@ -525,7 +525,7 @@ Writes to `/var`, `/tmp`, `/log`, or anywhere on the OS container's root filesys
 - **Podman: `--read-only` flag on `podman run`, or `read_only: true` in `compose.yaml` for the service.** Writes to the rootfs fail with `EROFS`. Combined with `tmpfs:` mounts for legitimately-writable paths (e.g., `/tmp`), this gives a clear "writes only where allowed" posture.
 - **Kubernetes: `securityContext.readOnlyRootFilesystem: true` on the container.** Combined with `emptyDir` (or generic ephemeral) volumes for any path that must be writable. Semantically equivalent to Podman.
 - Podman `tmpfs:` and Kubernetes `emptyDir: { medium: Memory }` both give RAM-backed temp space that counts against the memory limit, not disk. Useful for performance-sensitive tmp.
-- Quirks: `emptyDir` is mounted world-writable without sticky bit, which breaks some Ruby/Java tmp-dir checks; the workaround is generic ephemeral volumes. Less of a concern in C++ but worth noting.
+- Quirks: `emptyDir` is mounted world-writable without sticky bit, which breaks some Ruby/Java tmp-dir checks; the workaround is generic ephemeral volumes. Less of a concern in C++.
 - Resource limits: `resources.limits.ephemeral-storage` in k8s caps writable-layer + emptyDir + log volume. Podman has no direct equivalent but `--read-only` plus explicit `tmpfs` sizes provide similar bounding. C++ apps that write growing on-disk caches (e.g., RocksDB embedded) need explicit sizing either way.
 - Logs: 12-factor Factor XI says treat logs as event streams; in practice, C++ apps should write to stdout/stderr and let Podman/the orchestrator pick them up. Loki via Promtail/Alloy is the user's target.
 
@@ -655,7 +655,7 @@ Given the depth target (3000+ words, multiple code samples) and 11 docs (12 with
 7. **Doc 07** — state externalization (Redis, PostgreSQL, etc.); cache-fix for the Doc 01 counterexample.
 8. **Doc 08** — ephemeral filesystem trap.
 9. **Doc 09** — health checks.
-10. **Doc 10** — gRPC microservices integration; the capstone doc that pulls everything together.
+10. **Doc 10** — gRPC microservices integration; the example that pulls everything together.
 11. **Doc 11** — build tooling appendix (Conan, CMake).
 12. **Doc 00** — index, written last once cross-references are stable.
 

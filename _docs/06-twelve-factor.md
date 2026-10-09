@@ -98,9 +98,9 @@ Config parse_config(int argc, char** argv) {
 
 > **Opinion.** The single most useful refactor in a legacy C++ service migrating to containers is to eliminate every `std::getenv` outside `main()` and replace them with `Config` references plumbed through the construction graph. This is mechanical, low-risk, and pays back immediately in testability — `parse_config` is replaced with a test fixture, every subsystem becomes testable in isolation.
 
-For compile-time config — the dimensions that genuinely cannot move to runtime — keep it explicit. A template parameter or `if constexpr` branch on `Policy` is fine; a `#ifdef` strewn through implementation files is not. [Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) covers the Conan/CMake side of managing build variants.
+For compile-time config — the dimensions that cannot move to runtime — keep it explicit. A template parameter or `if constexpr` branch on `Policy` is fine; a `#ifdef` strewn through implementation files is not. [Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) covers the Conan/CMake side of managing build variants.
 
-For runtime-fetched config — the rare case where config genuinely needs to change mid-process — fetch via a dedicated subsystem that exposes the same `Config&`-style interface to the rest of the code. The handlers should not know whether the value came from an env var read at startup or a control plane fetched five seconds ago.
+For runtime-fetched config — the rare case where config needs to change mid-process — fetch via a dedicated subsystem that exposes the same `Config&`-style interface to the rest of the code. The handlers should not know whether the value came from an env var read at startup or a control plane fetched five seconds ago.
 
 ## Factor VI: Processes and the singleton problem
 
@@ -154,16 +154,16 @@ int main(int argc, char** argv) {
 
 > **Opinion.** Use Meyers singletons only when an external API requires global access — the OTel `Provider::SetTracerProvider`/`GetTracerProvider` pattern is the canonical case. Even then, the *ownership* lives in `main()`; the global is just an access mechanism the framework imposes. Everywhere else, dependency injection. The verbosity is the price; the testability and shutdown sanity are the return.
 
-The 12-factor "stateless processes" principle in C++ terms means: process-scoped state is fine ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covered this), but its *ownership* should be explicit in `main()`, not hidden in singletons. The process is killable because every process-scoped object is reconstructible from configuration; the construction graph is visible at the entry point. Hidden singletons defeat both properties.
+The 12-factor "stateless processes" principle in C++ terms means: process-scoped state is fine ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covered this), but its *ownership* should be explicit in `main()`, rather than inside singletons. The process is killable because every process-scoped object is reconstructible from configuration; the construction graph is visible at the entry point. Hidden singletons defeat both properties.
 
-For things that genuinely need to be globally available before `main()` runs — a small number of cases involving compile-time constants used in static initialization elsewhere — C++20's `constinit` is the right tool. It enforces compile-time initialization without forcing `const`:
+For things that need to be globally available before `main()` runs — a small number of cases involving compile-time constants used in static initialization elsewhere — C++20's `constinit` is the right tool. It enforces compile-time initialization without forcing `const`:
 
 ```cpp
 // Global, initialized at compile-time, mutable at runtime if needed.
 constinit std::atomic<bool> g_shutdown_requested{false};
 ```
 
-This avoids the SIOF (static initialization order fiasco) for the constant, gives the compiler permission to optimize aggressively, and is honest about the fact that the variable is genuinely global. Reach for `constinit` rarely; reach for it deliberately when you do.
+This avoids the SIOF (static initialization order fiasco) for the constant, gives the compiler permission to optimize aggressively, and makes clear that the variable is global. Reach for `constinit` rarely, and deliberately when you do.
 
 ## Factor IX: Disposability and the C++ startup tax
 
@@ -181,7 +181,7 @@ The mitigations are several.
 
 First, audit static constructors. Every namespace-scope object with a non-trivial constructor is a cost. A `std::unordered_map<std::string, RegexCompiler> g_regex_cache` that "lazily" populates on first use actually allocates the map at startup. A `Logger g_logger;` runs the `Logger` constructor before `main()`. Move these into function-local statics (with the singleton caveats above), or better, into `main()`-owned objects.
 
-Second, use `constinit` for things that genuinely need compile-time initialization. The atomic flag example above is one case; tables of compile-time constants are another. `constinit` makes the cost zero (compile-time-only) rather than deferred to startup.
+Second, use `constinit` for things that need compile-time initialization. The atomic flag example above is one case; tables of compile-time constants are another. `constinit` makes the cost zero (compile-time-only) rather than deferred to startup.
 
 Third, minimize shared library count. Each `.so` adds dynamic loader work. Static linking, where feasible, eliminates this entirely. The trade-off is binary size and update granularity; for a service binary distributed as a container image, the size cost is usually acceptable.
 
@@ -229,7 +229,7 @@ Treat 12-factor as the default and translate the three C++ collisions explicitly
 
 For Config, distinguish compile-time, link-time, env-time, and runtime-fetched dimensions. Put deploy-varying config in env-time, parsed once into a `Config` struct in `main()` and plumbed by reference. Eliminate `std::getenv` calls outside `main()`.
 
-For Processes, use dependency injection: construct process-scoped objects in `main()` by name, hold them in local variables, pass by reference to subsystems. Avoid Meyers singletons except where a framework requires global access; even then, ownership lives in `main()`. Use `constinit` for the small set of things that genuinely need to be globally available before `main()`.
+For Processes, use dependency injection: construct process-scoped objects in `main()` by name, hold them in local variables, pass by reference to subsystems. Avoid Meyers singletons except where a framework requires global access; even then, ownership lives in `main()`. Use `constinit` for the small set of things that need to be globally available before `main()`.
 
 For Disposability, audit static constructors and eliminate the ones that don't need to be global. Minimize shared library count where feasible. Defer expensive initialization until after the health endpoint is serving NOT_SERVING. Treat fast startup as a deploy-velocity question, not a micro-optimization.
 

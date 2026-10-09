@@ -146,7 +146,7 @@ SECTIONS = [
                  C.ACCENT_PURPLE),
             ],
             "notes": (
-                "Four framing numbers for the rest of the deck. Any replica "
+                "Four framing numbers for today's session. Any replica "
                 "answers any request: that's the interchangeability property "
                 "we're aiming for. Zero coordination to kill one: that's the "
                 "operational payoff, and it's what the orchestrator is relying "
@@ -448,18 +448,18 @@ SECTIONS = [
                 bullet("A naming convention or a code-review checklist can be skipped under deadline pressure"),
                 bullet("A destructor that the compiler calls on every path cannot be skipped"),
                 bullet("This is what makes \"nothing outlives the request\" a property you can rely on, not a hope"),
-                para("RAII is why C++ is a genuinely good fit for stateless "
+                para("RAII is why C++ is a good fit for stateless "
                      "services, despite having no garbage collector to lean on.",
                      size=Pt(15), italic=True, color=C.TEXT_MUTED),
             ],
             "notes": (
                 "This is the bridge slide back to the bigger picture. "
-                "Languages with a garbage collector get memory safety for "
-                "free but don't get deterministic, scope-tied cleanup for "
-                "free — a connection or a file handle held by a finalizer "
+                "Languages with a garbage collector get memory safety "
+                "automatically but don't get deterministic, scope-tied "
+                "cleanup — a connection or a file handle held by a finalizer "
                 "can linger arbitrarily long after you're done with it. C++ "
-                "gives up the free memory safety but gets deterministic "
-                "destruction in exchange, and that's exactly the guarantee "
+                "trades that automatic memory safety for deterministic "
+                "destruction, and that's exactly the guarantee "
                 "request scope needs.\n\n"
                 "Hold onto this one idea past today: statelessness is a "
                 "deployment posture, and RAII is the C++-specific mechanism "
@@ -494,7 +494,7 @@ SECTIONS = [
                 bullet("Process-scoped ownership done well — composition roots, dependency injection over singletons"),
                 bullet("Threading under a real CPU quota — why hardware_concurrency() lies to you in a container"),
                 bullet("Reaching external state safely — pooled connections, the outbox pattern, idempotency, deadlines"),
-                bullet("The ephemeral filesystem, health checks, graceful shutdown, and a full gRPC capstone that composes all of it"),
+                bullet("The ephemeral filesystem, health checks, graceful shutdown, and a full gRPC end-to-end example that composes all of it"),
             ],
             "notes": (
                 "Everything on this slide is a direct extension of something "
@@ -505,7 +505,7 @@ SECTIONS = [
                 "definition with a concrete pattern for assembling it at "
                 "startup. State externalization is the full engineering "
                 "answer to the external-state scope we only named today. And "
-                "the gRPC capstone shows all three scopes, RAII, PMR, and "
+                "the gRPC end-to-end example shows all three scopes, RAII, PMR, and "
                 "externalization composed into one real service.\n\n"
                 "Read the documents in order if you want the full arc; each "
                 "one stands alone if you already know roughly where you need "

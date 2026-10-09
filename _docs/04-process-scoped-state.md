@@ -72,7 +72,7 @@ The single most useful artifact in this doc set; referenced from several others.
 | Authoritative session / user state | — | — (external) |
 | User-visible counters, rate-limit windows | — | — (external) |
 
-Two rows worth dwelling on. The fourth from the bottom — "Authoritative session / user state" — has no check in either column. It belongs in *external* state (Redis, PostgreSQL, Kafka) because the service is stateless: data that clients depend on cannot live in any single replica. [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) develops the externalization pattern. The same is true of user-visible counters and rate-limit windows — they have to be consistent across replicas, which means they live in a shared store.
+Two rows stand out. The fourth from the bottom — "Authoritative session / user state" — has no check in either column. It belongs in *external* state (Redis, PostgreSQL, Kafka) because the service is stateless: data that clients depend on cannot live in any single replica. [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) develops the externalization pattern. The same is true of user-visible counters and rate-limit windows — they have to be consistent across replicas, which means they live in a shared store.
 
 > **Opinion.** When you find yourself wanting to put something in the "process-scoped" column because it's faster than externalizing, ask: does the next request need to see this? If yes, it has to be externalized regardless of cost. If no — best-effort cache, computed-once derived value, parsed config — then process-scoped is fine. The performance answer is almost never to ignore the architectural constraint.
 
@@ -263,7 +263,7 @@ For density-sensitive workloads — caches where the per-entry overhead matters 
 
 For caches specifically, prefer libraries with explicit byte budgets over rolling your own on top of `unordered_map`. Implementations like `folly::EvictingCacheMap`, the various `lru_cache` libraries, or a small custom type behind a clean RAII interface are all reasonable. The criterion is that the size is bounded in bytes and the eviction policy is explicit.
 
-For things that genuinely don't grow — prepared-statement caches with a known set, parsed configuration, channel caches keyed by a finite set of upstreams — a plain `std::unordered_map` is fine because the size is bounded by the input.
+For things that don't grow — prepared-statement caches with a known set, parsed configuration, channel caches keyed by a finite set of upstreams — a plain `std::unordered_map` is fine because the size is bounded by the input.
 
 > **Opinion.** Pick the type based on the worst-case memory budget, not the typical-case access pattern. A cache that's "usually small" but unbounded is the same bug as one that's "definitely large" — both can be killed by an unexpected workload.
 

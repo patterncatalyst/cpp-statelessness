@@ -339,7 +339,7 @@ The trade-off versus stackless coroutines: more memory per concurrent operation,
 
 Treat TLS as process-scoped. Wrap any TLS write in an RAII guard that restores the prior value. Never assume TLS read after `co_await` returns the same value it did before.
 
-Pick a concurrency model deliberately. Stackless coroutines for new code; fibers for incremental migration; OS threads for the small number of cases where ownership of a kernel-scheduled thread is what you actually want.
+Match the concurrency model to the constraint. Stackless coroutines for new code; fibers for incremental migration; OS threads for the small number of cases where ownership of a kernel-scheduled thread is what you actually want.
 
 For gRPC, use the callback API or asio-grpc for new work. Never block inside a handler. Dispatch long work to a worker pool or coroutine executor.
 
