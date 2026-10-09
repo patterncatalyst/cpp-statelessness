@@ -42,7 +42,7 @@ SLIDE_W, SLIDE_H = bp.SLIDE_W, bp.SLIDE_H
 
 OUT_PATH = ROOT / "presentation" / "cpp-statelessness-compendium.pptx"
 NOTES_PATH = ROOT / "presentation" / "build-notes-statelessness.md"
-REPO_URL = "github.com/patterncatalyst/cpp-container-optimization-tutorial"
+REPO_URL = "github.com/patterncatalyst/cpp-statelessness"
 
 
 def build_title(prs, total):

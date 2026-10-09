@@ -288,7 +288,7 @@ SECTIONS = [
                 "one of three exit paths — normal return, early return, and "
                 "throw. Logging in the destructor proves it fires on all "
                 "three. RAII cleanup made visible."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-02-raii/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-02-raii/",
             "notes": (
                 "Watch the destructor log line appear once per request "
                 "regardless of which exit path the handler took. The point "
@@ -403,7 +403,7 @@ SECTIONS = [
                 "The layered monotonic + pool arena in action: per-request "
                 "allocation freed in bulk, the release-cost asymmetry measured, "
                 "and the lifetime trap caught live by AddressSanitizer."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-03-pmr/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-03-pmr/",
             "notes": (
                 "Two things to watch: the timing difference between "
                 "per-element free and bulk arena reclamation, and then the "
@@ -641,7 +641,7 @@ SECTIONS = [
                 "A cgroup-aware probe and a pool-size sweep under --cpus=2 show "
                 "that oversubscription buys no throughput and wrecks tail "
                 "latency through CFS throttling."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-05-threading/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-05-threading/",
             "notes": (
                 "The sweep runs the same workload with progressively larger "
                 "pools under a 2-core quota. Watch throughput plateau while p99 "
@@ -891,7 +891,7 @@ SECTIONS = [
                 "publishes the outbox to Kafka with FOR UPDATE SKIP LOCKED; an "
                 "idempotent consumer applies it. A crash mid-publish still "
                 "yields an exactly-once effect."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-07-outbox-pattern/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-07-outbox-pattern/",
             "notes": (
                 "The companion uses libpq (not libpqxx — its bundled CMake "
                 "breaks the toolchain), librdkafka's C API, and a single-node "
@@ -988,7 +988,7 @@ SECTIONS = [
                 "trap and the stdout-sink fix, ephemerality demonstrated across "
                 "container restarts, and why scratch belongs on an explicit "
                 "tmpfs."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-08-ephemeral-filesystem/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-08-ephemeral-filesystem/",
             "notes": (
                 "The demo first shows the EROFS failure with the default file "
                 "logger, then the same service logging cleanly to stdout. Then "
@@ -1100,7 +1100,7 @@ SECTIONS = [
                 "Staged startup (NOT_SERVING → SERVING), liveness vs readiness "
                 "on separate ports, a SIGUSR1 readiness toggle, and the "
                 "signal-safe graceful-shutdown sequence to a clean exit."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-09-health-checks/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-09-health-checks/",
             "notes": (
                 "Three acts: staged startup with liveness answering 200 while "
                 "readiness is still NOT_SERVING during init; a SIGUSR1 toggle "
@@ -1233,7 +1233,7 @@ SECTIONS = [
                 "calling a tax service over gRPC. Three acts: a taxable order, "
                 "a tax-exempt short-circuit, and an idempotent replay returning "
                 "the identical order id."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-10-grpc-microservices/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-10-grpc-microservices/",
             "notes": (
                 "Act 1 prices a taxable order for alice — full path: Postgres "
                 "lookups plus the outbound tax gRPC call. Act 2 prices for "
@@ -1351,7 +1351,7 @@ SECTIONS = [
                 "binary swept under --cpus / --memory caps so cpu_limit_cores() "
                 "is shown tracking the cgroup while hardware_concurrency() does "
                 "not."),
-            "demo_url": "patterncatalyst.github.io/cpp-container-optimization-tutorial/examples/statelessness-11-build-tooling/",
+            "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-11-build-tooling/",
             "notes": (
                 "Act 1 runs the gtest suite green inside the container. Then the "
                 "cap sweep: unconstrained, --cpus=1.5, --cpus=0.5 --memory=256m. "

@@ -42,7 +42,7 @@ C, F, FontFam = bp.C, bp.F, bp.FontFam
 SLIDE_W, SLIDE_H = bp.SLIDE_W, bp.SLIDE_H
 
 OUT_PATH = ROOT / "presentation" / "cpp-statelessness-101.pptx"
-REPO_URL = "github.com/patterncatalyst/cpp-container-optimization-tutorial"
+REPO_URL = "github.com/patterncatalyst/cpp-statelessness"
 
 
 def build_title(prs, total):
