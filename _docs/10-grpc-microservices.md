@@ -3,14 +3,15 @@ title: Microservices with gRPC and C++ (capstone)
 description: "The capstone integration. A realistic order-pricing service skeleton: proto, Config, RequestContext, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete main() with twelve cross-referenced steps, full podman-compose.yaml, full Kubernetes manifest. Every prior pattern in one place."
 order: 10
 layout: tutorial
-sectionid: reference
+sectionid: docs
+part: integration-tooling
 ---
 
 # 10 — Microservices with gRPC and C++
 
 ## Thesis
 
-This is the integration document. The prior nine established patterns in isolation: RAII for request scope ([Doc 02 (RAII)](../02-raii/)), PMR arenas for per-request allocation ([Doc 03 (PMR)](../03-pmr/)), process-scoped state owned in `main()` ([Doc 04 (process-scoped state)](../04-process-scoped-state/)), threading model ([Doc 05 (threading)](../05-threading/)), 12-factor adaptation ([Doc 06 (12-factor)](../06-twelve-factor/)), state externalization ([Doc 07 (state externalization)](../07-state-externalization/)), ephemeral filesystem ([Doc 08 (ephemeral filesystem)](../08-ephemeral-filesystem/)), health checks and shutdown ([Doc 09 (health checks)](../09-health-checks/)). This document shows them composed in a realistic gRPC service — a small but plausible "order pricing" service that exercises every prior pattern in a single end-to-end implementation.
+This is the integration document. The prior nine established patterns in isolation: RAII for request scope ([Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }})), PMR arenas for per-request allocation ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), process-scoped state owned in `main()` ([Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }})), threading model ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), 12-factor adaptation ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})), state externalization ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})), ephemeral filesystem ([Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), health checks and shutdown ([Doc 09 (health checks)]({{ '/docs/09-health-checks/' | relative_url }})). This document shows them composed in a realistic gRPC service — a small but plausible "order pricing" service that exercises every prior pattern in a single end-to-end implementation.
 
 The shape: a service proto, a `Config` struct, a `RequestContext` type, a process-scoped wiring in `main()`, a handler that touches PostgreSQL, Redis, and an upstream gRPC service, the health-check and graceful-shutdown sequence, and a deployment wrapper in both `podman-compose.yaml` and Kubernetes manifest form. The code is C++20-portable; C++23 features called out where they meaningfully help. The implementations are sketches — production code adds more error handling and instrumentation — but they're complete enough that the composition is visible.
 
@@ -44,7 +45,7 @@ This document is heavier on code than the others by design. The point is to make
 >   the Redis cache-aside is marked as a seam where a `GET` would slot in.
 > - **gRPC API:** the companion uses the **sync** API rather than the
 >   callback API sketched below; the composition is identical and the
->   migration is mechanical ([Doc 05](../05-threading/)).
+>   migration is mechanical ([Doc 05]({{ '/docs/05-threading/' | relative_url }})).
 >
 > So when the code below constructs a span, injects trace context, or reads
 > from Redis, read it as *the design* — the companion proves the
@@ -88,11 +89,11 @@ message PriceOrderResponse {
 }
 ```
 
-The handler will be a callback-API implementation ([Doc 05](../05-threading/)). The application logic is straightforward; what's worth showing is how the patterns from earlier compose around it.
+The handler will be a callback-API implementation ([Doc 05]({{ '/docs/05-threading/' | relative_url }})). The application logic is straightforward; what's worth showing is how the patterns from earlier compose around it.
 
 ## The Config struct
 
-[Doc 06](../06-twelve-factor/) established the pattern: parse env-time configuration once in `main()` into an immutable struct, pass it by reference. For this service:
+[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) established the pattern: parse env-time configuration once in `main()` into an immutable struct, pass it by reference. For this service:
 
 ```cpp
 struct Config {
@@ -116,7 +117,7 @@ Every subsystem receives `const Config&` (or the specific subsection it needs). 
 
 ## The `RequestContext`
 
-The per-request RAII bundle from [Doc 02](../02-raii/), fleshed out with PMR ([Doc 03](../03-pmr/)) and OTel scope ([Doc 05](../05-threading/)):
+The per-request RAII bundle from [Doc 02]({{ '/docs/02-raii/' | relative_url }}), fleshed out with PMR ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})) and OTel scope ([Doc 05]({{ '/docs/05-threading/' | relative_url }})):
 
 {% raw %}
 ```cpp
@@ -179,13 +180,13 @@ private:
 ```
 {% endraw %}
 
-The destruction order — scope first, span second, pool third, monotonic resource fourth — falls out of the member declaration order in reverse. The arena's no-op `do_deallocate` ([Doc 03](../03-pmr/)) means destroying the per-request `pmr::vector`s and `pmr::string`s inside the handler is essentially free; only the final monotonic-resource destruction reclaims the buffer.
+The destruction order — scope first, span second, pool third, monotonic resource fourth — falls out of the member declaration order in reverse. The arena's no-op `do_deallocate` ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})) means destroying the per-request `pmr::vector`s and `pmr::string`s inside the handler is essentially free; only the final monotonic-resource destruction reclaims the buffer.
 
-The OTel `Scope` is the TLS guard from [Doc 05](../05-threading/) — constructing it makes the span active on the current thread, destructing it restores the prior active span. As long as the handler doesn't `co_await` (this example is synchronous), the active-span TLS is consistent throughout.
+The OTel `Scope` is the TLS guard from [Doc 05]({{ '/docs/05-threading/' | relative_url }}) — constructing it makes the span active on the current thread, destructing it restores the prior active span. As long as the handler doesn't `co_await` (this example is synchronous), the active-span TLS is consistent throughout.
 
 ## Process-scoped state
 
-The pieces from [Doc 04](../04-process-scoped-state/) and [Doc 07](../07-state-externalization/), named here so the wiring is concrete:
+The pieces from [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) and [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}), named here so the wiring is concrete:
 
 ```cpp
 class ChannelCache {
@@ -211,7 +212,7 @@ The `ChannelCache` is a thin wrapper around gRPC's `CreateChannel`. The mutex pr
 
 ## The handler
 
-The application logic in callback-API form ([Doc 05](../05-threading/)):
+The application logic in callback-API form ([Doc 05]({{ '/docs/05-threading/' | relative_url }})):
 
 ```cpp
 grpc::ServerUnaryReactor* PricingService::PriceOrder(
@@ -280,11 +281,11 @@ grpc::ServerUnaryReactor* PricingService::PriceOrder(
 }
 ```
 
-Two things to notice. First, the `try`/`catch` is for error-to-status translation, not for resource cleanup — all resource cleanup happens through RAII ([Doc 02](../02-raii/)). Second, the helper functions throw `grpc::Status` for protocol-level errors (deadline exceeded, unavailable) and `std::exception` for programming errors. The boundary translates both to the right wire-level status; the destructors run regardless.
+Two things to notice. First, the `try`/`catch` is for error-to-status translation, not for resource cleanup — all resource cleanup happens through RAII ([Doc 02]({{ '/docs/02-raii/' | relative_url }})). Second, the helper functions throw `grpc::Status` for protocol-level errors (deadline exceeded, unavailable) and `std::exception` for programming errors. The boundary translates both to the right wire-level status; the destructors run regardless.
 
 ## Helper: PostgreSQL access with deadline
 
-The `fetch_customer` helper demonstrates the connection-pool checkout with deadline propagation ([Doc 07](../07-state-externalization/)):
+The `fetch_customer` helper demonstrates the connection-pool checkout with deadline propagation ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})):
 
 ```cpp
 Customer PricingService::fetch_customer(
@@ -326,11 +327,11 @@ Customer PricingService::fetch_customer(
 }
 ```
 
-The pattern from [Doc 07](../07-state-externalization/) is intact: deadline-based `statement_timeout`, `invalidate()` on broken connection, return-to-pool on the normal path or on SQL-error. The customer `struct` returned is a regular C++ value type — owned by the caller, lifetime separate from the connection.
+The pattern from [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) is intact: deadline-based `statement_timeout`, `invalidate()` on broken connection, return-to-pool on the normal path or on SQL-error. The customer `struct` returned is a regular C++ value type — owned by the caller, lifetime separate from the connection.
 
 ## Helper: outbound gRPC with deadline and context propagation
 
-The `compute_tax` helper demonstrates outbound gRPC, using the channel cache and propagating both deadline and trace context ([Doc 04](../04-process-scoped-state/), [Doc 07](../07-state-externalization/)):
+The `compute_tax` helper demonstrates outbound gRPC, using the channel cache and propagating both deadline and trace context ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}), [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})):
 
 {% raw %}
 ```cpp
@@ -372,15 +373,15 @@ The channel comes from the process-scoped cache. Stub construction off the chann
 
 ## A note on threading
 
-The handler shown above is synchronous-style: blocking `acquire()` on the PG pool, blocking `stub->CalculateTax()` on the outbound gRPC. Under the callback API ([Doc 05](../05-threading/)), this means each in-flight `PriceOrder` occupies a gRPC thread for its full duration. For low-to-medium fan-in, this is acceptable; size the gRPC thread pool with headroom ([Doc 05](../05-threading/)'s pattern), and the service handles the expected load comfortably.
+The handler shown above is synchronous-style: blocking `acquire()` on the PG pool, blocking `stub->CalculateTax()` on the outbound gRPC. Under the callback API ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), this means each in-flight `PriceOrder` occupies a gRPC thread for its full duration. For low-to-medium fan-in, this is acceptable; size the gRPC thread pool with headroom ([Doc 05]({{ '/docs/05-threading/' | relative_url }})'s pattern), and the service handles the expected load comfortably.
 
-For higher fan-in, the same handler logic converts to coroutines via asio-grpc. The handler becomes an `asio::awaitable`; `pg_pool_.acquire_async()` and `stub->CalculateTax_async()` `co_await` their completion; the gRPC thread pool serves more concurrent calls because none are blocked on I/O. The TLS-across-`co_await` gotcha applies — the `RequestContext`'s OTel scope must be captured into the coroutine frame rather than relied upon via TLS after a suspension. [Doc 05](../05-threading/) covers the migration.
+For higher fan-in, the same handler logic converts to coroutines via asio-grpc. The handler becomes an `asio::awaitable`; `pg_pool_.acquire_async()` and `stub->CalculateTax_async()` `co_await` their completion; the gRPC thread pool serves more concurrent calls because none are blocked on I/O. The TLS-across-`co_await` gotcha applies — the `RequestContext`'s OTel scope must be captured into the coroutine frame rather than relied upon via TLS after a suspension. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers the migration.
 
 For this document, the sync version stays. The coroutine version is a mechanical refactor once the team is ready.
 
 ## Full `main()`
 
-The wiring that ties everything together ([Doc 04](../04-process-scoped-state/), [Doc 06](../06-twelve-factor/), [Doc 09](../09-health-checks/)):
+The wiring that ties everything together ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}), [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}), [Doc 09]({{ '/docs/09-health-checks/' | relative_url }})):
 
 ```cpp
 int main(int argc, char** argv) try {
@@ -494,7 +495,7 @@ int main(int argc, char** argv) try {
 
 Twelve numbered steps; every one of them maps back to a prior document. The structure is mechanical and the same shape applies to any C++ gRPC service in this stack — only the specific subsystems change.
 
-The signal handler from [Doc 09](../09-health-checks/) is unchanged:
+The signal handler from [Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) is unchanged:
 
 ```cpp
 void install_signal_handler(grpc::Server* server,
@@ -517,7 +518,7 @@ void install_signal_handler(grpc::Server* server,
 
 ## Compose deployment
 
-The `podman-compose.yaml` wrapper, with read-only rootfs ([Doc 08](../08-ephemeral-filesystem/)), resource limits ([Doc 04](../04-process-scoped-state/)), and the gRPC health check ([Doc 09](../09-health-checks/)):
+The `podman-compose.yaml` wrapper, with read-only rootfs ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), resource limits ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})), and the gRPC health check ([Doc 09]({{ '/docs/09-health-checks/' | relative_url }})):
 
 ```yaml
 services:
@@ -658,7 +659,7 @@ spec:
     targetPort: 50051
 ```
 
-The `CPU_LIMIT` environment variable is sourced from the container's own `resources.limits.cpu` via the `resourceFieldRef` mechanism — the Kubernetes downward API. The application then reads `$CPU_LIMIT` at startup rather than re-deriving from cgroups. This is the cleanest production wiring for the pattern from [Doc 05](../05-threading/); the orchestrator already knows the limit, so the application should not re-derive it.
+The `CPU_LIMIT` environment variable is sourced from the container's own `resources.limits.cpu` via the `resourceFieldRef` mechanism — the Kubernetes downward API. The application then reads `$CPU_LIMIT` at startup rather than re-deriving from cgroups. This is the cleanest production wiring for the pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}); the orchestrator already knows the limit, so the application should not re-derive it.
 
 The `securityContext` block is the Kubernetes counterpart to a hardened container — read-only rootfs, non-root user, no privilege escalation, all capabilities dropped. These are independent of statelessness but worth turning on by default for any production service.
 
@@ -678,25 +679,25 @@ This shape extends to every gRPC service in the stack. New services replace `Pri
 
 ## Cross-references
 
-[Doc 01](../01-deployment-posture/) set up the deployment-posture vocabulary that this document operationalizes.
+[Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) set up the deployment-posture vocabulary that this document operationalizes.
 
-[Doc 02](../02-raii/) covers RAII discipline and the `RequestContext` pattern shown above.
+[Doc 02]({{ '/docs/02-raii/' | relative_url }}) covers RAII discipline and the `RequestContext` pattern shown above.
 
-[Doc 03](../03-pmr/) covers PMR and the per-request arena in the `RequestContext` member.
+[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) covers PMR and the per-request arena in the `RequestContext` member.
 
-[Doc 04](../04-process-scoped-state/) covers process-scoped state and the `main()`-owned wiring pattern shown in the example.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped state and the `main()`-owned wiring pattern shown in the example.
 
-[Doc 05](../05-threading/) covers the threading model and the cgroup-detection helper used in `main()`.
+[Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers the threading model and the cgroup-detection helper used in `main()`.
 
-[Doc 06](../06-twelve-factor/) covers 12-factor adaptation and the `Config` struct pattern.
+[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) covers 12-factor adaptation and the `Config` struct pattern.
 
-[Doc 07](../07-state-externalization/) covers backing-service pools and the `fetch_customer`/`compute_tax` helper patterns.
+[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) covers backing-service pools and the `fetch_customer`/`compute_tax` helper patterns.
 
-[Doc 08](../08-ephemeral-filesystem/) covers the ephemeral filesystem and the `read_only: true` configuration.
+[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers the ephemeral filesystem and the `read_only: true` configuration.
 
-[Doc 09](../09-health-checks/) covers health checks and the graceful-shutdown sequence at the bottom of `main()`.
+[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) covers health checks and the graceful-shutdown sequence at the bottom of `main()`.
 
-[Doc 11](../11-build-tooling/) (build tooling appendix) covers the Conan recipes for grpc, protobuf, opentelemetry-cpp, libpqxx, redis-plus-plus, spdlog, and the CMake configuration that builds the whole binary.
+[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) (build tooling appendix) covers the Conan recipes for grpc, protobuf, opentelemetry-cpp, libpqxx, redis-plus-plus, spdlog, and the CMake configuration that builds the whole binary.
 
 ## Annotated bibliography
 

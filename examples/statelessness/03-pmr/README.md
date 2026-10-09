@@ -1,7 +1,7 @@
 # statelessness/03-pmr — the PMR request arena
 
 Compendium reference:
-[Doc 03 — PMR and the request arena](../../../reference/statelessness/03-pmr/)
+[Doc 03 — PMR and the request arena](../../../_docs/03-pmr.md)
 
 The runnable companion to compendium Doc 03. Where 02-raii showed a
 `RequestContext` carrying a small arena, this example goes deep on the
@@ -46,7 +46,7 @@ reused, which is exactly the kind of "random" production failure that's
 miserable to chase. The trap lives in its own binary because you cannot
 safely host a use-after-free inside a long-lived service. The fix
 (a cache that owns its entries) is in
-[Doc 07](../../../reference/statelessness/07-state-externalization/).
+[Doc 07](../../../_docs/07-state-externalization.md).
 
 ## Running it
 
@@ -63,10 +63,8 @@ cache on the host makes it fast.
 
 ## A note on AddressSanitizer in containers
 
-For what shadow memory actually *is* — how ASan keeps one shadow byte
-per eight bytes of your memory, why it needs a large contiguous mapping,
-and the full set of container failure modes and fixes — see
-[§12 Analysis & debugging](../../../docs/12-analysis-debugging/). The
+For the AddressSanitizer dev-profile setup behind this demo, see
+[Doc 11 — Build tooling](../../../_docs/11-build-tooling.md). The
 short operational version for this example:
 
 The demo runs `pmr-trap` directly. On most kernels ASan maps its shadow

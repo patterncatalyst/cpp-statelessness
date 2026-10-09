@@ -15,11 +15,7 @@ github_path: examples/statelessness/02-raii
 > The full source for this example lives in [`examples/statelessness/02-raii/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/02-raii) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 02 — RAII as the foundation for safe stateful work]({{ '/reference/statelessness/02-raii/' | relative_url }})
-
-Tutorial sections:
-[§3 RAII & Container Resource Discipline]({{ '/docs/03-raii-discipline/' | relative_url }}) +
-[§7 Memory Management]({{ '/docs/07-memory-management/' | relative_url }})
+[Doc 02 — RAII as the foundation for safe stateful work]({{ '/docs/02-raii/' | relative_url }})
 
 A deliberately small gRPC service whose only job is to make the
 **RequestContext** lifecycle visible. Where compendium Doc 02 explains
@@ -197,29 +193,18 @@ This example deepens material from the project's
 - **Enberg, *Latency*, ch. 2** — why per-request work must be bounded and
   released promptly under load, the latency framing behind request scope
 
-## Linked tutorial sections
-
-- [**§3 RAII & Container Resource Discipline**]({{ '/docs/03-raii-discipline/' | relative_url }}) —
-  the tutorial section this example is the worked companion to: RAII as the
-  enforcement mechanism for request scope, exception safety, and why
-  destructors are the cleanup contract under containers.
-- [**§7 Memory Management**]({{ '/docs/07-memory-management/' | relative_url }}) —
-  the `RequestContext`'s PMR arena member is sized and reasoned about here;
-  the per-request arena is developed in full in the
-  [PMR companion]({{ '/examples/statelessness-03-pmr/' | relative_url }}).
-
 ## Where it sits in the compendium
 
 RAII request scope is the foundation the other compendium examples build
 on. The process-scoped wiring
-([Doc 04]({{ '/reference/statelessness/04-process-scoped-state/' | relative_url }}))
+([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}))
 owns the lease pool this example leases from; the PMR arena
-([Doc 03]({{ '/reference/statelessness/03-pmr/' | relative_url }}))
+([Doc 03]({{ '/docs/03-pmr/' | relative_url }}))
 is the `RequestContext` member shown here, in full; the connection-pool
 checkout
-([Doc 07]({{ '/reference/statelessness/07-state-externalization/' | relative_url }}))
+([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}))
 is the real resource the lease stands in for; and graceful shutdown
-([Doc 09]({{ '/reference/statelessness/09-health-checks/' | relative_url }}))
+([Doc 09]({{ '/docs/09-health-checks/' | relative_url }}))
 relies on the same reverse-order destruction. The capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 composes all of them in one service.

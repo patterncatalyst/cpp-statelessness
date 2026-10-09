@@ -3,7 +3,8 @@ title: RAII as the foundation for safe stateful work
 description: "The mechanism that makes request scope concrete. The RequestContext pattern, the three exception-safety guarantees, the gRPC callback API as the request boundary, the common mistakes (throwing destructors, raw pointers, locks across co_await), and the performance side of construction and destruction in hot paths."
 order: 2
 layout: tutorial
-sectionid: reference
+sectionid: docs
+part: request-scope
 ---
 
 # 02 — RAII as the Foundation for Safe Stateful Work in a Stateless Service
@@ -172,7 +173,7 @@ A handful of recurring mistakes are particularly costly in a service context.
 
 **Raw `new`/`delete` for per-request resources.** Once you write `auto* x = new Thing(...)`, you have committed to either tracking every exit path and calling `delete` on each, or wrapping it in a smart pointer immediately. The latter is almost always right. `std::unique_ptr<Thing>` with a custom deleter for non-`delete`-cleanable resources is the workhorse.
 
-**Locks held across `co_await`.** A coroutine that holds a `std::unique_lock<std::mutex>` and then suspends on `co_await` may resume on a different thread. The lock was acquired by thread A; when the coroutine resumes on thread B, the lock is now held by a thread that didn't acquire it. This is undefined behaviour with most mutex implementations. Mitigations: use a coroutine-aware async mutex (several libraries provide one, including Boost.Asio's experimental channel-based primitives), or structure the work so that the lock is released before `co_await` and re-acquired after. [Doc 05 (threading)](../05-threading/) develops this further alongside the broader threading model.
+**Locks held across `co_await`.** A coroutine that holds a `std::unique_lock<std::mutex>` and then suspends on `co_await` may resume on a different thread. The lock was acquired by thread A; when the coroutine resumes on thread B, the lock is now held by a thread that didn't acquire it. This is undefined behaviour with most mutex implementations. Mitigations: use a coroutine-aware async mutex (several libraries provide one, including Boost.Asio's experimental channel-based primitives), or structure the work so that the lock is released before `co_await` and re-acquired after. [Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }}) develops this further alongside the broader threading model.
 
 **Manual try/catch cleanup paths.** Code that looks like this:
 
@@ -269,13 +270,13 @@ grpc::Status FetchAndStore(const Request* req, Response* resp) {
 }
 ```
 
-The shape of the fix is always the same: replace owning raw pointers with owning RAII types, and let the compiler handle cleanup. [Doc 07 (state externalization)](../07-state-externalization/) covers the connection-pool `ScopedConnection` implementation in detail, including the question of what to do when the connection is in an unusable state at release time (mark it invalid rather than return it to the pool).
+The shape of the fix is always the same: replace owning raw pointers with owning RAII types, and let the compiler handle cleanup. [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }}) covers the connection-pool `ScopedConnection` implementation in detail, including the question of what to do when the connection is in an unusable state at release time (mark it invalid rather than return it to the pool).
 
 ## The performance side of RAII
 
 RAII is correctness machinery, but in a hot path running billions of times the constants of construction and destruction matter. Five points are worth knowing concretely.
 
-**Constructor cost is dominated by allocation.** A `std::string` constructed in a handler from a `std::string_view` requires a heap allocation unless the result is small enough to live in the string's small-buffer optimization region — typically up to 15 bytes on libstdc++, 22 on libc++ (implementation-defined; check your toolchain). For a handler that builds many short strings, SBO is a major silent optimization. For a handler that builds long strings, every construction is a malloc call: lock contention in the glibc arena, possible page faults on fresh pages, fragmentation across thread arenas. Mitigations are PMR allocators backed by a per-request arena ([Doc 03 (PMR)](../03-pmr/)), `reserve()` on `std::vector` and `std::string` to known caps, and `std::span`/`std::string_view` where ownership isn't actually needed.
+**Constructor cost is dominated by allocation.** A `std::string` constructed in a handler from a `std::string_view` requires a heap allocation unless the result is small enough to live in the string's small-buffer optimization region — typically up to 15 bytes on libstdc++, 22 on libc++ (implementation-defined; check your toolchain). For a handler that builds many short strings, SBO is a major silent optimization. For a handler that builds long strings, every construction is a malloc call: lock contention in the glibc arena, possible page faults on fresh pages, fragmentation across thread arenas. Mitigations are PMR allocators backed by a per-request arena ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), `reserve()` on `std::vector` and `std::string` to known caps, and `std::span`/`std::string_view` where ownership isn't actually needed.
 
 **Destructor cost is asymmetric across allocator strategies.** A `std::unordered_map<K, V>` with N entries destroys each entry individually — N destructors, N deallocations, N pointer chases through the hash buckets. A `std::pmr::unordered_map<K, V>` backed by a `monotonic_buffer_resource` destroys each entry's destructor *and* a no-op deallocate (the arena reclaims everything in one shot when it dies). For trivially destructible value types, the per-entry destructor compiles out entirely, leaving just the arena release. This is the most concrete reason PMR pays off in handlers that build large transient structures: not the allocation savings, but the destruction-time collapse from O(N) to O(1).
 
@@ -285,7 +286,7 @@ RAII is correctness machinery, but in a hot path running billions of times the c
 
 **Allocator awareness is a per-type choice.** Default-allocator `std::string` and `std::vector` in a handler hit the global heap, which means lock contention in the malloc arena, fragmentation across thread arenas, and unpredictable tail latency from page faults and arena rebalancing. Allocator-aware variants (PMR or custom) move the allocation budget into a place you can reason about per request. The choice is per-type and per-call-site: a long-lived `std::string` in a process-scoped cache map doesn't need PMR; a transient `std::string` in a handler does.
 
-> **Opinion.** The single most useful refactor in a hot-path handler is: identify the largest transient structure, replace its default allocator with a PMR one backed by the request arena, and measure. The result is usually a measurable P99 improvement and a quieter heap profile. [Doc 03](../03-pmr/) develops the technique end-to-end.
+> **Opinion.** The single most useful refactor in a hot-path handler is: identify the largest transient structure, replace its default allocator with a PMR one backed by the request arena, and measure. The result is usually a measurable P99 improvement and a quieter heap profile. [Doc 03]({{ '/docs/03-pmr/' | relative_url }}) develops the technique end-to-end.
 
 ## C++23 improvements worth noting
 
@@ -308,7 +309,7 @@ The handler dispatches on the `std::expected` without a `try`/`catch`, and the R
 
 `std::pmr::stacktrace` provides a stacktrace whose internal storage is PMR-allocated. Captured in a per-request handler with the request arena as the resource, a stacktrace at the point of an error costs nothing extra to clean up — it dies with the arena. For services that capture stacks on errors for telemetry (sending them to Tempo or as span attributes), this keeps even the diagnostic path arena-local.
 
-Both features are available in GCC 14 and Clang 18 with libc++; [Doc 11 (build tooling)](../11-build-tooling/) covers the build-tooling specifics for enabling them under Conan and CMake.
+Both features are available in GCC 14 and Clang 18 with libc++; [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers the build-tooling specifics for enabling them under Conan and CMake.
 
 ## Recommendation summary
 
@@ -326,15 +327,15 @@ Reach for `std::expected<T, E>` (C++23) for the expected-failure paths inside a 
 
 ## Cross-references
 
-[Doc 03](../03-pmr/) develops the PMR pattern specifically — `monotonic_buffer_resource`, layered pool resources, per-handler arenas, and the `std::` container choices that work well over them.
+[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) develops the PMR pattern specifically — `monotonic_buffer_resource`, layered pool resources, per-handler arenas, and the `std::` container choices that work well over them.
 
-[Doc 04](../04-process-scoped-state/) covers process-scoped state and how its lifetime differs from request-scoped state — the State Architecture Table makes the distinction explicit and shows what belongs in each column.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped state and how its lifetime differs from request-scoped state — the State Architecture Table makes the distinction explicit and shows what belongs in each column.
 
-[Doc 05](../05-threading/) covers threading and the `thread_local`-is-process-scope trap, which interacts with the RAII discipline: a TLS guard is itself an RAII type, but its scope is the handler, not the thread.
+[Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers threading and the `thread_local`-is-process-scope trap, which interacts with the RAII discipline: a TLS guard is itself an RAII type, but its scope is the handler, not the thread.
 
-[Doc 07](../07-state-externalization/) covers state externalization and the `ScopedConnection` RAII pattern for connection-pool checkout, referenced in the counterexample above.
+[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) covers state externalization and the `ScopedConnection` RAII pattern for connection-pool checkout, referenced in the counterexample above.
 
-[Doc 10](../10-grpc-microservices/) (gRPC microservices) shows the `RequestContext` and friends wired into a complete callback-API service skeleton.
+[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) (gRPC microservices) shows the `RequestContext` and friends wired into a complete callback-API service skeleton.
 
 ## Annotated bibliography
 
@@ -345,10 +346,10 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Yonts, *100 C++ Mistakes and How to Avoid Them*.** The cluster of mistakes around throwing destructors, raw `new`/`delete`, manual cleanup paths, missing `noexcept` on moves, and exception safety in general directly informs the "common mistakes" section above. Useful as a code-review checklist for any handler under review.
 
-**"C++ High Performance" (2nd edition).** The RAII chapter and the chapter on move semantics cover the constructor/destructor cost angle in depth, with measurements. The chapter on memory layout is the entry point for the PMR work in [Doc 03](../03-pmr/).
+**"C++ High Performance" (2nd edition).** The RAII chapter and the chapter on move semantics cover the constructor/destructor cost angle in depth, with measurements. The chapter on memory layout is the entry point for the PMR work in [Doc 03]({{ '/docs/03-pmr/' | relative_url }}).
 
 **Enberg, *Latency*.** The framing of destructor cost asymmetry as a tail-latency consideration comes from here; the book is also useful for the broader question of where deterministic cleanup matters most.
 
 **Geewax, *API Design Patterns*.** The chapter on idempotency and the chapters on standard error responses are relevant to the `std::expected` discussion above — what to return on the failing path is an API design question as much as a C++ one.
 
-**"Building Low Latency Applications with C++".** Background reference for the cost model of standard-library operations under load; cited more directly in [Doc 05](../05-threading/) (threading) and [Doc 07](../07-state-externalization/) (state externalization).
+**"Building Low Latency Applications with C++".** Background reference for the cost model of standard-library operations under load; cited more directly in [Doc 05]({{ '/docs/05-threading/' | relative_url }}) (threading) and [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) (state externalization).

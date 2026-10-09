@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Excalidraw diagrams
-description: Architecture and flow diagrams for the tutorial. Each diagram renders inline; click for a fullscreen view, or download the .excalidraw source to edit.
+description: Architecture and flow diagrams for the statelessness compendium. Each diagram renders inline; click for a fullscreen view, or download the .excalidraw source to edit.
 permalink: /diagrams/
 ---
 
@@ -10,8 +10,8 @@ permalink: /diagrams/
         <span class="hero__eyebrow">Reference</span>
         <h1>Excalidraw diagrams.</h1>
         <p class="hero__lead">
-            Architecture and flow diagrams for the tutorial. Click any
-            diagram to open it fullscreen. Each is also available as
+            Architecture and flow diagrams for the statelessness compendium.
+            Click any diagram to open it fullscreen. Each is also available as
             <code>.excalidraw</code> source — open it on
             <a href="https://excalidraw.com" rel="noopener">excalidraw.com</a>
             to edit.
@@ -23,106 +23,82 @@ permalink: /diagrams/
     <div class="container">
         <div class="gallery">
             {% include diagram-card.html
-                file="01-prerequisites-toolchain"
-                section="§1"
-                title="Toolchain layout"
-                caption="What gets installed where: Fedora packages, toolchain, Conan, Podman storage." %}
+                file="statelessness/01-deployment-posture"
+                section="Ch 01"
+                title="Deployment posture"
+                caption="Stateless vs stateful as deployment posture — the same C++ binary, two state choices." %}
 
             {% include diagram-card.html
-                file="02-introduction-four-layers"
-                section="§2"
-                title="The four-layer mental model"
-                caption="The four-layer model: toolchain, image, kernel, runtime." %}
+                file="statelessness/02-raii"
+                section="Ch 02"
+                title="RAII per-request scope"
+                caption="RequestContext as RAII per-request scope: ctor acquires, dtor releases on every exit." %}
 
             {% include diagram-card.html
-                file="02-threading-models"
-                section="§2"
-                title="Threading models in C++"
-                caption="Threading models by stack model, kernel visibility, and I/O- vs CPU-bound fit." %}
+                file="statelessness/03-pmr"
+                section="Ch 03"
+                title="PMR monotonic_buffer_resource"
+                caption="PMR monotonic_buffer_resource: bump-pointer per request, single bulk free at scope-end." %}
 
             {% include diagram-card.html
-                file="03-raii-discipline"
-                section="§3"
-                title="RAII vs manual cleanup"
-                caption="RAII vs manual cleanup: destructors fire on every exit path." %}
+                file="statelessness/04-process-scoped-state"
+                section="Ch 04"
+                title="The state architecture table"
+                caption="The State Architecture Table: process-scoped, request-scoped, external — sort early." %}
 
             {% include diagram-card.html
-                file="04-image-strategy-multistage"
-                section="§4"
-                title="Multi-stage image strategy"
-                caption="Single-stage vs multi-stage Containerfile." %}
+                file="statelessness/05-threading"
+                section="Ch 05"
+                title="Threading under cgroup limits"
+                caption="Threading in a cgroup-constrained service: cpu.max budgets the worker pool." %}
 
             {% include diagram-card.html
-                file="05-compile-time-pgo-flow"
-                section="§5"
-                title="LTO and PGO build flow"
-                caption="Three-pass PGO: instrument → profile → optimize." %}
+                file="statelessness/06-twelve-factor"
+                section="Ch 06"
+                title="12-Factor adapted to C++"
+                caption="12-Factor adapted to C++: nine map directly, three collide (Config, Processes, Disposability)." %}
 
             {% include diagram-card.html
-                file="06-stl-layout-flat-vs-node"
-                section="§6"
-                title="Flat vs node containers"
-                caption="Memory layout: contiguous vector vs node-based containers." %}
+                file="statelessness/07-state-externalization"
+                section="Ch 07"
+                title="State externalization"
+                caption="State externalization: process-scoped pool, ScopedConnection RAII, authoritative state outside the process." %}
 
             {% include diagram-card.html
-                file="07-allocator-stack"
-                section="§7"
-                title="Allocator stack"
-                caption="Allocator stack: app → PMR → malloc → page cache → cgroups → host." %}
+                file="statelessness/07-outbox-sequence"
+                section="Ch 07"
+                title="The Outbox pattern"
+                caption="Outbox: order + event written in one transaction; a relay publishes with FOR UPDATE SKIP LOCKED; an idempotent consumer applies ON CONFLICT — at-least-once delivery plus idempotent apply = exactly-once effect." %}
 
             {% include diagram-card.html
-                file="08-io-uring-rings"
-                section="§8"
-                title="io_uring submission/completion"
-                caption="io_uring SQ/CQ rings in shared memory." %}
+                file="statelessness/08-ephemeral-filesystem"
+                section="Ch 08"
+                title="The ephemeral filesystem trap"
+                caption="The ephemeral filesystem: overlayfs scratch + tmpfs vanish on restart, only PVCs persist, logs to stdout." %}
 
             {% include diagram-card.html
-                file="09-networking-veth-vs-host"
-                section="§9"
-                title="Container networking modes"
-                caption="Packet path: veth+bridge vs slirp4netns vs --network=host." %}
+                file="statelessness/09-health-checks"
+                section="Ch 09"
+                title="The three probes"
+                caption="Three probes (startup, liveness, readiness) and the graceful-shutdown sequence that ties scope destructors together." %}
 
             {% include diagram-card.html
-                file="10-observability-otel-stack"
-                section="§10"
-                title="Observability stack"
-                caption="OTel pipeline: C++ → OTel SDK → OTLP → Grafana stack." %}
+                file="statelessness/09-probe-states-shutdown"
+                section="Ch 09"
+                title="Probe states and shutdown sequence"
+                caption="Health states (Starting → Serving ⇄ NotReady → Draining → Stopped) and the ordered SIGTERM shutdown sequence: flag, drain readiness, stop workers, Shutdown(deadline), reverse-order teardown, exit 0." %}
 
             {% include diagram-card.html
-                file="11-isolation-cgroup-tree"
-                section="§11"
-                title="cgroup v2 weight & cpuset"
-                caption="Two-tenant cgroup hierarchy with delegated controllers." %}
+                file="statelessness/10-grpc-microservices"
+                section="Ch 10"
+                title="gRPC capstone"
+                caption="gRPC capstone: a complete order-pricing service composing process-, request-, and external-scope state." %}
 
             {% include diagram-card.html
-                file="11-numa-local-remote"
-                section="§11"
-                title="NUMA local vs remote"
-                caption="Local memory ~100ns; crossing the interconnect to the other node is ~1.5-2x slower. Pin cpuset.cpus + cpuset.mems." %}
-
-            {% include diagram-card.html
-                file="12-debug-sidecar-pattern"
-                section="§12"
-                title="Ephemeral gdb sidecar"
-                caption="Ephemeral gdb sidecar sharing the service's PID namespace." %}
-
-            {% include diagram-card.html
-                file="13-reproducibility-conan-flow"
-                section="§13"
-                title="Hermetic build pipeline"
-                caption="Hermetic build: Conan → CMake/Ninja → reproducible binary." %}
-
-            {% include diagram-card.html
-                file="13-abi-break-taxonomy"
-                section="§13"
-                title="ABI break taxonomy"
-                caption="What is safe to change vs what breaks the binary contract (layout, vtable, signatures) — bump the SONAME, catch with abidiff." %}
-
-            {% include diagram-card.html
-                file="14-pitfalls-avx512-mismatch"
-                section="§14"
-                title="The AVX-512 mismatch trap"
-                caption="AVX-512 mismatch: build host has it, runtime doesn't → SIGILL." %}
+                file="statelessness/11-build-tooling"
+                section="Ch 11"
+                title="Conan dev vs release profiles"
+                caption="Conan dev vs release profiles: same sources, same lockfile, two parallel build flows producing two binaries." %}
         </div>
     </div>
 </section>

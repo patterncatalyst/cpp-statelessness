@@ -15,11 +15,7 @@ github_path: examples/statelessness/05-threading
 > The full source for this example lives in [`examples/statelessness/05-threading/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/05-threading) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 05 — Threading under container limits]({{ '/reference/statelessness/05-threading/' | relative_url }})
-
-Tutorial sections:
-[§11 Noisy Neighbor Isolation]({{ '/docs/11-noisy-neighbors/' | relative_url }}) +
-[§8 I/O Latency: io_uring, Async gRPC]({{ '/docs/08-io-latency/' | relative_url }})
+[Doc 05 — Threading under container limits]({{ '/docs/05-threading/' | relative_url }})
 
 The one-line takeaway: **`std::thread::hardware_concurrency()` lies under a
 cgroup CPU limit** — it reports the host's core count, not your container's
@@ -80,8 +76,7 @@ CI verification: `scripts/test-stateless-demo-05-threading.sh`.
 
 Rootless `--cpus` only enforces a real CFS quota if the cgroup v2 `cpu`
 controller is delegated to your user slice; the demo detects this and points
-you at `scripts/cgroup-delegation.sh enable` if it's missing (the same
-delegation the isolation demo uses).
+you at `scripts/cgroup-delegation.sh enable` if it's missing.
 
 ## What you'll see
 
@@ -129,7 +124,7 @@ GCC 14 and Podman 5.x, running the container under `--cpus=2`:
 - `CMakeLists.txt` — two binaries; no external dependencies
 - `Containerfile` — UBI 10 (base gcc/gcc-c++ + cmake) → `ubi-minimal`; no
   Conan, no gRPC
-- `demo.sh` — the driver (`podman run --cpus`, like the isolation demo)
+- `demo.sh` — the driver (`podman run --cpus`)
 
 ## Caveats and gotchas
 
@@ -137,9 +132,7 @@ GCC 14 and Podman 5.x, running the container under `--cpus=2`:
   enforces a real CFS quota rootless if the cgroup v2 `cpu` controller is
   delegated to your user slice. Without it, the flag is accepted but not
   enforced and the throttling effect is muted — the tails won't climb. Enable
-  it with `scripts/cgroup-delegation.sh enable`, then re-login. This is the
-  same delegation the [isolation example]({{ '/examples/statelessness-05-threading/' | relative_url }})
-  in the main track relies on.
+  it with `scripts/cgroup-delegation.sh enable`, then re-login.
 - **The throttle window is the CFS period (~100 ms).** The max-latency
   number tracks the default `cpu.cfs_period_us`. Shortening the period
   reduces individual stalls but raises scheduling overhead; it's rarely the
@@ -166,17 +159,6 @@ This example deepens material from the project's
   in the composition root and injecting it, rather than reaching for a global
   thread pool sized at static-init time
 
-## Linked tutorial sections
-
-- [**§11 Noisy Neighbor Isolation**]({{ '/docs/11-noisy-neighbors/' | relative_url }}) —
-  cgroups, CPU pinning, NUMA, and CFS quota enforcement; this example is the
-  thread-pool-sizing half of that section, and the isolation demo there shows
-  the multi-tenant version of the same throttling.
-- [**§8 I/O Latency: io_uring, Async gRPC**]({{ '/docs/08-io-latency/' | relative_url }}) —
-  where the I/O-bound side of pool sizing lives: async gRPC and io_uring let
-  a small pool serve many concurrent requests without one-thread-per-request
-  oversubscription.
-
 ## Beyond your own pools
 
 The same lie reaches pools you didn't write — gRPC's sync server
@@ -186,7 +168,7 @@ host with a small quota), jemalloc (`MALLOC_CONF=narenas:…`, or
 `narenas:auto` on recent versions which reads the cgroup), OpenMP, TBB, and
 the C++ parallel algorithms all probe the host by default. Size them from the
 cgroup, as the compendium
-[threading reference]({{ '/reference/statelessness/05-threading/' | relative_url }})
+[threading reference]({{ '/docs/05-threading/' | relative_url }})
 details.
 
 ## Where it sits in the compendium
@@ -195,7 +177,7 @@ The `unsynchronized` choice in the
 [PMR arena]({{ '/examples/statelessness-03-pmr/' | relative_url }}) is
 justified by the threading model here — one thread per request arena. The
 cgroup-aware pool sizing this example demonstrates is exactly what
-[process-scoped state]({{ '/reference/statelessness/04-process-scoped-state/' | relative_url }})
+[process-scoped state]({{ '/docs/04-process-scoped-state/' | relative_url }})
 uses to size its pools, and what the capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 applies when it sizes the gRPC server's thread pool from the CPU budget.

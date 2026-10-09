@@ -1,7 +1,7 @@
 # statelessness/08-ephemeral-filesystem — the read-only rootfs
 
 Compendium reference:
-[Doc 08 — The ephemeral filesystem trap](../../../reference/statelessness/08-ephemeral-filesystem/)
+[Doc 08 — The ephemeral filesystem trap](../../../_docs/08-ephemeral-filesystem.md)
 
 The runnable companion to Doc 08. A container's filesystem is ephemeral:
 anything written outside an explicitly-mounted volume disappears on

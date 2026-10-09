@@ -1,7 +1,7 @@
 # statelessness/09-health-checks — health as the orchestrator's API
 
 Compendium reference:
-[Doc 09 — Health checks](../../../reference/statelessness/09-health-checks/)
+[Doc 09 — Health checks](../../../_docs/09-health-checks.md)
 
 The runnable companion to Doc 09. A health check is the orchestrator's
 API into your service: it decides whether to route traffic to a replica,
@@ -43,7 +43,7 @@ to drain in-flight RPCs → reverse-order teardown (Doc 04) → exit 0.
 **A hermetic `health-probe`** ([`src/health_probe.cpp`](src/health_probe.cpp)).
 Rather than download the upstream `grpc_health_probe` binary, the example
 builds its own minimal one from [`proto/health.proto`](proto/health.proto)
-— no build-time network dependency (§14), and the `Check` RPC is visible
+— no build-time network dependency, and the `Check` RPC is visible
 in the source instead of hidden in a prebuilt tool.
 
 ## Two corrections worth flagging vs the compendium prose

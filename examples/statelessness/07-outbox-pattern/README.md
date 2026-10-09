@@ -1,7 +1,7 @@
 # statelessness/07-outbox-pattern — atomic DB write + event emission
 
 Compendium reference:
-[Doc 07 — State externalization](../../../reference/statelessness/07-state-externalization/)
+[Doc 07 — State externalization](../../../_docs/07-state-externalization.md)
 (the *Outbox pattern* section)
 
 The runnable companion to Doc 07's Outbox pattern. A stateless service

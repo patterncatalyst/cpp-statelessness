@@ -15,12 +15,8 @@ github_path: examples/statelessness/07-outbox-pattern
 > The full source for this example lives in [`examples/statelessness/07-outbox-pattern/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/07-outbox-pattern) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 07 — State externalization]({{ '/reference/statelessness/07-state-externalization/' | relative_url }})
+[Doc 07 — State externalization]({{ '/docs/07-state-externalization/' | relative_url }})
 (the *Outbox pattern* section)
-
-Tutorial sections:
-[§8 I/O Latency: io_uring, Async gRPC]({{ '/docs/08-io-latency/' | relative_url }}) +
-[§9 Networking & Kernel Parameters]({{ '/docs/09-networking-kernel/' | relative_url }})
 
 A stateless service often has to update its database *and* announce the
 change to the rest of the system. Doing those as two independent steps has a
@@ -181,15 +177,6 @@ This example deepens material from the project's
 - **Andrist & Sehr, *C++ High Performance* 2e, ch. 9** — the RAII wrappers
   over the librdkafka C API; owning a C resource safely from C++
 
-## Linked tutorial sections
-
-- [**§8 I/O Latency: io_uring, Async gRPC**]({{ '/docs/08-io-latency/' | relative_url }}) —
-  the latency of crossing to Kafka and back; the relay's flush-and-confirm is
-  an I/O-latency decision.
-- [**§9 Networking & Kernel Parameters**]({{ '/docs/09-networking-kernel/' | relative_url }}) —
-  broker connections, listener configuration, and the network-level settings
-  behind talking to Kafka across the compose network.
-
 ## Production note
 
 A real deployment would run several relay replicas (the `FOR UPDATE SKIP
@@ -205,5 +192,5 @@ The outbox builds directly on
 same `pg_pool.hpp`, same `ON CONFLICT` idempotency — and extends it with
 atomic event emission. The idempotent-consumer discipline is the same
 authoritative-dedup idea the capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 applies to its idempotency store.

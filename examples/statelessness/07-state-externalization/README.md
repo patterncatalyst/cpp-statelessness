@@ -1,7 +1,7 @@
 # statelessness/07-state-externalization — authoritative state in PostgreSQL
 
 Compendium reference:
-[Doc 07 — State externalization](../../../reference/statelessness/07-state-externalization/)
+[Doc 07 — State externalization](../../../_docs/07-state-externalization.md)
 
 The runnable companion to compendium Doc 07, and the first compendium
 example with a real backing store. A stateless service cannot hold

@@ -1,7 +1,7 @@
 # Statelessness Compendium — sub-project PRD
 
 **Status:** drafted 2026-05-17, post-r145 review
-**Sub-project of:** [main PRD](../PRD.md)
+**Sub-project of:** the main project `PRD.md` (parent tutorial project; not part of this repo)
 **Reconciliation:** rounds tracked in [reconciliation-plan.md](reconciliation-plan.md)
 
 ---
@@ -415,7 +415,7 @@ get appended here.
 
 ## 15. How this PRD relates to the main project PRD
 
-The main [`PRD.md`](../PRD.md) covers the tutorial-plus-7-demos-plus-
+The main `PRD.md` (parent tutorial project) covers the tutorial-plus-7-demos-plus-
 PPTX-plus-bibliography body of work. The statelessness compendium is
 mentioned there in §7 (Diagrams — `_reference/statelessness/`
 appears in the directory layout) and §14 (Stakeholders — under
@@ -436,9 +436,9 @@ the §6 runnable examples list.
 
 - [r145 review of the compendium](reconciliation-plan.md) — the
   triggering review that surfaced R1-R5
-- [Main `PRD.md`](../PRD.md) — parent project PRD
-- [`_reference/statelessness/00-index.md`](../_reference/statelessness/00-index.md)
+- Main `PRD.md` — parent project PRD (historical reference, not part of this repo)
+- [`_docs/00-index.md`](../_docs/00-index.md)
   — the compendium's own reading guide
-- [`LESSONS-LEARNED.md` §1.4](../LESSONS-LEARNED.md) — the
+- `LESSONS-LEARNED.md` §1.4 — the
   "demo cross-references should stay internal" lesson, applicable
-  here too
+  here too (historical reference, not part of this repo)

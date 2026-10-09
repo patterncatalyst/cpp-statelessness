@@ -1,7 +1,7 @@
 # statelessness/05-threading — sizing the pool to the cgroup, not the host
 
 Compendium reference:
-[Doc 05 — Threading under container limits](../../../reference/statelessness/05-threading/)
+[Doc 05 — Threading under container limits](../../../_docs/05-threading.md)
 
 The runnable companion to compendium Doc 05. The one-line takeaway:
 **`std::thread::hardware_concurrency()` lies under a cgroup CPU limit** —
@@ -68,7 +68,8 @@ repo helper, then re-login:
 ../../../scripts/cgroup-delegation.sh enable
 ```
 
-This is the same delegation that demo-05 (isolation) relies on.
+Delegate the controller once per host and every rootless Podman demo that
+enforces CPU limits benefits from it.
 
 ## Layout
 
@@ -79,7 +80,7 @@ This is the same delegation that demo-05 (isolation) relies on.
 ├── src/pool_bench.cpp   CPU-bound workload across a sized pool; latency percentiles
 ├── CMakeLists.txt       two binaries; no external deps
 ├── Containerfile        UBI 10 (gcc + cmake) → ubi-minimal; no Conan/gRPC
-└── demo.sh              the driver (podman run --cpus, like demo-05)
+└── demo.sh              the driver (podman run --cpus)
 ```
 
 ## Beyond your own pools

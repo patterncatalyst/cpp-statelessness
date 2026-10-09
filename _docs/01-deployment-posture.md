@@ -3,7 +3,8 @@ title: Stateless vs stateful as deployment posture
 description: "The vocabulary doc. Statelessness is not a code property; it's a deployment posture the same C++ binary can or cannot satisfy depending on what state it holds. Three-scope vocabulary, six monolith intuitions that mislead."
 order: 1
 layout: tutorial
-sectionid: reference
+sectionid: docs
+part: deployment-posture
 ---
 
 # 01 — Stateless vs Stateful as Deployment Posture, Not a Code Property
@@ -12,7 +13,7 @@ sectionid: reference
 
 In a Kubernetes or container-orchestrator context, "stateless" and "stateful" are properties of the deployment, not of the code. The same C++ binary can be deployed as a stateless `Deployment` — interchangeable replicas, horizontal scale, rolling restarts without ceremony — or as a member of a `StatefulSet` with stable identity, ordered rollout, and a per-pod persistent volume claim. The C++ standard says nothing about either; the orchestrator's manifest decides. This single fact gets missed surprisingly often by C++ developers coming from monolithic server backgrounds, who tend to write code that assumes a long-lived, single-instance process — and then are surprised when their service either won't scale or loses data on restart.
 
-This document establishes the vocabulary used throughout the rest of the set. Subsequent documents go deep on the C++ mechanics: RAII discipline ([Doc 02 (RAII)](../02-raii/)), per-request arenas ([Doc 03 (PMR)](../03-pmr/)), the boundary between request-scoped and process-scoped state ([Doc 04 (process-scoped state)](../04-process-scoped-state/)), the threading model that crosses both ([Doc 05 (threading)](../05-threading/)), the 12-factor implications for C++ ([Doc 06 (12-factor)](../06-twelve-factor/)), and so on. The point of starting here is that none of those mechanics matter if the architectural posture is wrong: a binary that *cannot* be deployed stateless will have its design problems amplified by every clever per-request optimization, not solved by them.
+This document establishes the vocabulary used throughout the rest of the set. Subsequent documents go deep on the C++ mechanics: RAII discipline ([Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }})), per-request arenas ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), the boundary between request-scoped and process-scoped state ([Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }})), the threading model that crosses both ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), the 12-factor implications for C++ ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})), and so on. The point of starting here is that none of those mechanics matter if the architectural posture is wrong: a binary that *cannot* be deployed stateless will have its design problems amplified by every clever per-request optimization, not solved by them.
 
 {% include excalidraw.html name="statelessness/01-deployment-posture" caption="Stateless vs stateful as deployment posture — the same C++ binary, two state choices." %}
 
@@ -165,7 +166,7 @@ services:
       start_period: 2s
 ```
 
-The `read_only: true` flag makes the rootfs immutable so accidental writes fail loudly rather than silently disappearing on restart ([Doc 08 (ephemeral filesystem)](../08-ephemeral-filesystem/) develops this). The `tmpfs` mount provides a legitimately-writable `/tmp`. The `deploy.resources` block sets the OS container's CPU and memory budget, which the C++ side must respect when sizing process-scoped state — connection pools, in-process caches, the PMR upstream resource ([Doc 04](../04-process-scoped-state/) covers this in detail). The `healthcheck` uses the bundled `grpc_health_probe` binary against the standard gRPC health protocol ([Doc 09 (health checks)](../09-health-checks/)).
+The `read_only: true` flag makes the rootfs immutable so accidental writes fail loudly rather than silently disappearing on restart ([Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) develops this). The `tmpfs` mount provides a legitimately-writable `/tmp`. The `deploy.resources` block sets the OS container's CPU and memory budget, which the C++ side must respect when sizing process-scoped state — connection pools, in-process caches, the PMR upstream resource ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers this in detail). The `healthcheck` uses the bundled `grpc_health_probe` binary against the standard gRPC health protocol ([Doc 09 (health checks)]({{ '/docs/09-health-checks/' | relative_url }})).
 
 For Kubernetes, the same image runs under either a `Deployment` (stateless scaling) or a `StatefulSet` (ordinal identity). A `Deployment` manifest:
 
@@ -305,13 +306,13 @@ private:
 
 In a single-instance monolith, this works as written. Deployed under a 10-replica `Deployment` behind a load balancer, it does not: a client sending two requests one second apart is likely to hit two different replicas, neither of which sees the other's `last_seen_` entry, so both replicas say "Hello" rather than "Welcome back." The behaviour appears to work in development (single replica), drifts under load, and is essentially impossible to debug from logs because each replica's view is internally consistent.
 
-The fix is not to remove the cache; it is to move it. A Redis cache keyed by user name, with a five-second TTL, gives the same behaviour and is correct across replicas. [Doc 07 (state externalization)](../07-state-externalization/) develops this pattern. The point here is that the *code* did not change posture — the *deployment* changed posture, from one replica to many, and exposed an assumption the code had silently encoded.
+The fix is not to remove the cache; it is to move it. A Redis cache keyed by user name, with a five-second TTL, gives the same behaviour and is correct across replicas. [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }}) develops this pattern. The point here is that the *code* did not change posture — the *deployment* changed posture, from one replica to many, and exposed an assumption the code had silently encoded.
 
 ## Vocabulary: scopes
 
 The doc set leans heavily on a three-level distinction. Establishing it here so subsequent documents can use it without redefining.
 
-**Request scope.** State that lives for exactly one inbound RPC or HTTP request. Examples: the parsed request message, intermediate computation, a per-request span context, a per-request PMR arena ([Doc 03](../03-pmr/)), a checked-out database connection. In gRPC C++, the `CallbackServerContext` or `ServerContext` lifetime defines this scope; the handler's stack frame and the request and response objects passed in are all request-scoped.
+**Request scope.** State that lives for exactly one inbound RPC or HTTP request. Examples: the parsed request message, intermediate computation, a per-request span context, a per-request PMR arena ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})), a checked-out database connection. In gRPC C++, the `CallbackServerContext` or `ServerContext` lifetime defines this scope; the handler's stack frame and the request and response objects passed in are all request-scoped.
 
 **Process scope.** State that lives for the lifetime of the process and rebuilds from configuration on cold start. Examples: the OpenTelemetry `TracerProvider`, the cache of gRPC `Channel` objects keyed by target, the Redis or PostgreSQL connection pool, the upstream `pmr::memory_resource` from which per-request arenas pull when they overflow, prepared statement caches, JIT-warmed branches in the CPU.
 
@@ -333,15 +334,15 @@ C++ developers from monolithic-server backgrounds — long-running daemons, dedi
 
 The first is that the process lives forever. In a monolith, `main()` is entered once on the morning of go-live and exited only when someone deploys a new version, typically months later. In Kubernetes, the kubelet may kill and restart your pod for any number of reasons: node draining, OOM kills, liveness-probe failures, voluntary disruption budgets, image updates, autoscaling churn, even node patching. Designing for "long-lived process" is designing for the rare case; the common case is a process that exits within hours or days.
 
-The second is that disk writes persist. They do not. The container's root filesystem is an overlay that dies with the container. Anything written outside an explicitly mounted volume disappears. [Doc 08](../08-ephemeral-filesystem/) covers this in detail.
+The second is that disk writes persist. They do not. The container's root filesystem is an overlay that dies with the container. Anything written outside an explicitly mounted volume disappears. [Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers this in detail.
 
-The third is that a `static` map is fine for caching. It works correctly in a single-instance monolith because there is exactly one process. It is at best a per-replica cache in a containerized deployment, and at worst a correctness bug if other replicas can see inconsistent data via it — exactly the failure mode in the counterexample above. The `static` is not the problem per se; the problem is the assumption that *the process is the right granularity* for the cache. Usually it is not. The right granularity is either the request ([Doc 03](../03-pmr/)) or the cluster (an external cache, [Doc 07](../07-state-externalization/)).
+The third is that a `static` map is fine for caching. It works correctly in a single-instance monolith because there is exactly one process. It is at best a per-replica cache in a containerized deployment, and at worst a correctness bug if other replicas can see inconsistent data via it — exactly the failure mode in the counterexample above. The `static` is not the problem per se; the problem is the assumption that *the process is the right granularity* for the cache. Usually it is not. The right granularity is either the request ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})) or the cluster (an external cache, [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})).
 
-The fourth is that the singleton stores data. Singletons that hold pure configuration are usually fine. Singletons that hold *mutating* data — a session table, a counter, a queue of pending work — are essentially in-process state stores, and as such inherit all the problems of in-process state across replicas. [Doc 06](../06-twelve-factor/) discusses the singleton anti-pattern in detail.
+The fourth is that the singleton stores data. Singletons that hold pure configuration are usually fine. Singletons that hold *mutating* data — a session table, a counter, a queue of pending work — are essentially in-process state stores, and as such inherit all the problems of in-process state across replicas. [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) discusses the singleton anti-pattern in detail.
 
-The fifth is that the file is the log. In a monolith, you write logs to `/var/log/myservice/myservice.log` and a logrotate cron handles rotation. In a container, you write to `stdout` and the orchestrator collects, ships, and rotates. The 12-factor "logs as event streams" principle ([Doc 06](../06-twelve-factor/), [Doc 08](../08-ephemeral-filesystem/)) is operationally enforced by the platform — fighting it leads to losing log data on restart.
+The fifth is that the file is the log. In a monolith, you write logs to `/var/log/myservice/myservice.log` and a logrotate cron handles rotation. In a container, you write to `stdout` and the orchestrator collects, ships, and rotates. The 12-factor "logs as event streams" principle ([Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}), [Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})) is operationally enforced by the platform — fighting it leads to losing log data on restart.
 
-The sixth is that the thread pool sizes itself to the box. On dedicated hardware, `std::thread::hardware_concurrency()` returned a number that matched what the OS would actually schedule. Under a container with CPU limits — `--cpus=0.5` in Podman, `resources.limits.cpu: "500m"` in Kubernetes — `hardware_concurrency()` still returns the host's CPU count, not the cgroup quota. A pool sized to the host count oversubscribes the actual budget, and the kernel's CFS throttling shows up as tail-latency spikes that are hard to attribute. The same gotcha applies to gRPC's default thread pool, to jemalloc/tcmalloc arena counts, and to any library that probes the CPU count at construction. The fix is to size pools explicitly from a `CPU_LIMIT` environment variable set by the orchestrator. Relatedly, `thread_local` storage was effectively request-local in many monolith server models (thread-per-request); in a thread-pool model under either runtime, `thread_local` is process-scoped and persists across requests that happen to share a thread. [Doc 05](../05-threading/) covers both gotchas in detail.
+The sixth is that the thread pool sizes itself to the box. On dedicated hardware, `std::thread::hardware_concurrency()` returned a number that matched what the OS would actually schedule. Under a container with CPU limits — `--cpus=0.5` in Podman, `resources.limits.cpu: "500m"` in Kubernetes — `hardware_concurrency()` still returns the host's CPU count, not the cgroup quota. A pool sized to the host count oversubscribes the actual budget, and the kernel's CFS throttling shows up as tail-latency spikes that are hard to attribute. The same gotcha applies to gRPC's default thread pool, to jemalloc/tcmalloc arena counts, and to any library that probes the CPU count at construction. The fix is to size pools explicitly from a `CPU_LIMIT` environment variable set by the orchestrator. Relatedly, `thread_local` storage was effectively request-local in many monolith server models (thread-per-request); in a thread-pool model under either runtime, `thread_local` is process-scoped and persists across requests that happen to share a thread. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers both gotchas in detail.
 
 Each of these intuitions is correct in its original context. The point is not that the developer was wrong, but that the constraints have changed.
 
@@ -371,42 +372,42 @@ Treat the OS container as ephemeral. The reasonable upper bound on its lifetime 
 
 Use the orchestrator's primitives — environment variables, Podman `--hostname` or the Kubernetes downward API, env files or ConfigMaps/Secrets, healthchecks or probes — as the C++ binary's interface to its environment. Subsequent docs cover each in detail.
 
-Size process-scoped state — connection pools, in-process caches, prepared-statement caches, the PMR upstream resource — as an explicit fraction of the OS container's memory limit. An unbounded `std::unordered_map` reached for by reflex is a future OOM. [Doc 04](../04-process-scoped-state/) develops this.
+Size process-scoped state — connection pools, in-process caches, prepared-statement caches, the PMR upstream resource — as an explicit fraction of the OS container's memory limit. An unbounded `std::unordered_map` reached for by reflex is a future OOM. [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) develops this.
 
 Choose `std::` containers deliberately, not by reflex. `std::vector` with a sized `reserve()` beats `std::deque`/`std::list` in nearly all handler paths. `std::flat_map` (C++23) beats `std::map` for small N. PMR variants beat default-allocator variants for per-request scratch. Docs 03 and 04 develop this.
 
-Mind the cost of constructors and destructors in the hot path. RAII is correctness machinery, but the constants matter: trivially-destructible types cost nothing to destroy, PMR-allocated containers reclaim in one arena release rather than N node destructors, and `noexcept` move operations prevent silent copy fallback in standard containers. [Doc 02](../02-raii/) develops this.
+Mind the cost of constructors and destructors in the hot path. RAII is correctness machinery, but the constants matter: trivially-destructible types cost nothing to destroy, PMR-allocated containers reclaim in one arena release rather than N node destructors, and `noexcept` move operations prevent silent copy fallback in standard containers. [Doc 02]({{ '/docs/02-raii/' | relative_url }}) develops this.
 
-Treat threading infrastructure — pools, executors, fiber schedulers — as process-scoped state, and treat thread-local storage as process-scoped rather than request-scoped. A `thread_local` variable used to carry a correlation ID across a handler will silently bleed across requests sharing a thread, and across `co_await` suspension points in a coroutine. [Doc 05](../05-threading/) develops this.
+Treat threading infrastructure — pools, executors, fiber schedulers — as process-scoped state, and treat thread-local storage as process-scoped rather than request-scoped. A `thread_local` variable used to carry a correlation ID across a handler will silently bleed across requests sharing a thread, and across `co_await` suspension points in a coroutine. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) develops this.
 
 ## Cross-references
 
-[Doc 02](../02-raii/) develops the RAII discipline that keeps request-scoped state contained, and the performance side of construction and destruction in hot paths.
+[Doc 02]({{ '/docs/02-raii/' | relative_url }}) develops the RAII discipline that keeps request-scoped state contained, and the performance side of construction and destruction in hot paths.
 
-[Doc 03](../03-pmr/) covers the PMR per-request arena pattern that gives request scope its operational efficiency, and the choice of `std::` container types in handlers.
+[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) covers the PMR per-request arena pattern that gives request scope its operational efficiency, and the choice of `std::` container types in handlers.
 
-[Doc 04](../04-process-scoped-state/) expands the process-scoped state column of the architecture table and covers OS container requests/limits in detail, including the CPU-limit gotcha around `std::thread::hardware_concurrency()`.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) expands the process-scoped state column of the architecture table and covers OS container requests/limits in detail, including the CPU-limit gotcha around `std::thread::hardware_concurrency()`.
 
-[Doc 05](../05-threading/) covers threading and concurrency in a stateless service — thread pools, TLS as process-scoped state, stack-based vs stackless concurrency, gRPC's threading model, I/O waits, and cooperative cancellation.
+[Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers threading and concurrency in a stateless service — thread pools, TLS as process-scoped state, stack-based vs stackless concurrency, gRPC's threading model, I/O waits, and cooperative cancellation.
 
-[Doc 06](../06-twelve-factor/) examines what 12-factor means for C++ specifically — especially around config (compile-time vs runtime), the singleton problem, and startup cost.
+[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) examines what 12-factor means for C++ specifically — especially around config (compile-time vs runtime), the singleton problem, and startup cost.
 
-[Doc 07](../07-state-externalization/) covers externalization of state to Redis, PostgreSQL, and similar backing services, including the cache-fix for the counterexample above.
+[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) covers externalization of state to Redis, PostgreSQL, and similar backing services, including the cache-fix for the counterexample above.
 
-[Doc 08](../08-ephemeral-filesystem/) covers the ephemeral filesystem and why disk writes are different in containers, including Podman `read_only` and Kubernetes `readOnlyRootFilesystem`.
+[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers the ephemeral filesystem and why disk writes are different in containers, including Podman `read_only` and Kubernetes `readOnlyRootFilesystem`.
 
-[Doc 09](../09-health-checks/) covers health checks — Podman `HEALTHCHECK` and Kubernetes probes — which are the orchestrator's view of whether your service is doing its job.
+[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) covers health checks — Podman `HEALTHCHECK` and Kubernetes probes — which are the orchestrator's view of whether your service is doing its job.
 
-[Doc 10](../10-grpc-microservices/) is the integrating gRPC C++ document where the patterns from all prior docs land in a single working service.
+[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) is the integrating gRPC C++ document where the patterns from all prior docs land in a single working service.
 
-[Doc 11](../11-build-tooling/) (build tooling appendix) covers the Conan and CMake setup behind the code samples in this and other documents.
+[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) (build tooling appendix) covers the Conan and CMake setup behind the code samples in this and other documents.
 
 ## Annotated bibliography
 
 _The works below are collected, with reading guidance and a cross-reference matrix, on the project [bibliography]({{ '/bibliography/' | relative_url }}) page._
 
 
-**Iglberger, *C++ Software Design*.** Particularly the chapters on the Single-Responsibility Principle and on dependency management. The framing of "who owns this state, and what is its lifetime" is core to the request/process/deploy-time scope vocabulary used throughout this doc set. The Singleton chapter (covered more in [Doc 06](../06-twelve-factor/)) is also relevant background here for the discussion of in-process state.
+**Iglberger, *C++ Software Design*.** Particularly the chapters on the Single-Responsibility Principle and on dependency management. The framing of "who owns this state, and what is its lifetime" is core to the request/process/deploy-time scope vocabulary used throughout this doc set. The Singleton chapter (covered more in [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }})) is also relevant background here for the discussion of in-process state.
 
 **Yonts, *100 C++ Mistakes and How to Avoid Them*.** The mistakes around static initialization order, raw-pointer ownership, and lifetimes inform the gotchas section above. Useful as a checklist when reviewing existing code for monolith-era assumptions; relevant entries cluster in the chapters on memory, lifetime, and modern C++ practice.
 
@@ -420,4 +421,4 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Kubernetes Patterns (O'Reilly), ch. 11 "Stateful Service".** Not in the user's reference list but the framing "behind every stateless service is a stateful one" comes from here and is worth knowing for anyone working on cloud-native architecture.
 
-**The Twelve-Factor App (`12factor.net`).** Factors VI (Processes — stateless) and IX (Disposability) are the canonical statements; [Doc 06](../06-twelve-factor/) examines what they mean concretely for C++.
+**The Twelve-Factor App (`12factor.net`).** Factors VI (Processes — stateless) and IX (Disposability) are the canonical statements; [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) examines what they mean concretely for C++.

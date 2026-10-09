@@ -1,7 +1,7 @@
 # statelessness/11-build-tooling — vendored helpers, made runnable
 
 Compendium reference:
-[Doc 11 — Build tooling appendix](../../../reference/statelessness/11-build-tooling/)
+[Doc 11 — Build tooling appendix](../../../_docs/11-build-tooling.md)
 
 Doc 11 is a build-tooling *reference*: Conan profiles, the library/version
 inventory, the C++23 toolchain matrix, the multi-stage Containerfile

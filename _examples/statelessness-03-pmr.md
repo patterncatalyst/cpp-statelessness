@@ -15,11 +15,7 @@ github_path: examples/statelessness/03-pmr
 > The full source for this example lives in [`examples/statelessness/03-pmr/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/03-pmr) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 03 — PMR and the request arena]({{ '/reference/statelessness/03-pmr/' | relative_url }})
-
-Tutorial sections:
-[§7 Memory Management]({{ '/docs/07-memory-management/' | relative_url }}) +
-[§6 STL, Layout & C++20/23 Containers]({{ '/docs/06-stl-layout/' | relative_url }})
+[Doc 03 — PMR and the request arena]({{ '/docs/03-pmr/' | relative_url }})
 
 Where [02-raii]({{ '/examples/statelessness-02-raii/' | relative_url }})
 showed a `RequestContext` carrying a small arena, this example goes deep on
@@ -177,8 +173,8 @@ READ of size 1 at 0x... thread T0
   `personality` syscall it needs is blocked by seccomp — so apply a
   host-side mitigation: `sudo sysctl vm.mmap_rnd_bits=28` or run with
   `--security-opt seccomp=unconfined`. The trap itself is real either way.
-  For what shadow memory is and the full set of failure modes, see
-  [§12 Analysis & debugging]({{ '/docs/12-analysis-debugging/' | relative_url }}).
+  For the AddressSanitizer dev-profile setup behind this demo, see
+  [Doc 11 — Build tooling]({{ '/docs/11-build-tooling/' | relative_url }}).
 - **The bench is a wall-clock micro-measurement.** It is not a substitute
   for measuring your real handler under real load. Treat it as a sanity
   check on the asymmetry, not a production benchmark.
@@ -195,28 +191,15 @@ This example deepens material from the project's
 - **Enberg, *Latency*, ch. 4** — the variance-and-tail framing that explains
   why the arena's reliable win is the tail, not the mean
 
-## Linked tutorial sections
-
-- [**§7 Memory Management**]({{ '/docs/07-memory-management/' | relative_url }}) —
-  allocators, huge pages, and cgroup memory limits; this example is the
-  request-scope half of that section's allocator story (the process-scope
-  half is the allocator demo in the main track).
-- [**§6 STL, Layout & C++20/23 Containers**]({{ '/docs/06-stl-layout/' | relative_url }}) —
-  the `std::pmr` container variants (`pmr::vector`, `pmr::string`,
-  `pmr::unordered_map`) used here, and the layout reasons they pay off.
-- [**§12 Analysis & Debugging**]({{ '/docs/12-analysis-debugging/' | relative_url }}) —
-  AddressSanitizer, shadow memory, and the container failure modes the
-  lifetime trap exercises.
-
 ## Where it sits in the compendium
 
 PMR builds directly on the RAII request scope from
 [Doc 02]({{ '/examples/statelessness-02-raii/' | relative_url }}); the
 threading rules behind the `unsynchronized` choice are in
-[Doc 05]({{ '/reference/statelessness/05-threading/' | relative_url }}),
+[Doc 05]({{ '/docs/05-threading/' | relative_url }}),
 and the cache fix for the lifetime trap — a cache that *owns* its entries —
 is in
-[Doc 07]({{ '/reference/statelessness/07-state-externalization/' | relative_url }}).
+[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
 The capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 carries this exact arena as a `RequestContext` member.

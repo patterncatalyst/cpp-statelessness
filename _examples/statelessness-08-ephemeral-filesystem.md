@@ -15,10 +15,7 @@ github_path: examples/statelessness/08-ephemeral-filesystem
 > The full source for this example lives in [`examples/statelessness/08-ephemeral-filesystem/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/08-ephemeral-filesystem) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 08 — The ephemeral filesystem trap]({{ '/reference/statelessness/08-ephemeral-filesystem/' | relative_url }})
-
-Tutorial sections:
-[§4 Container Strategy: UBI, ubi-micro, multi-stage]({{ '/docs/04-image-strategy/' | relative_url }})
+[Doc 08 — The ephemeral filesystem trap]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})
 
 A container's filesystem is ephemeral: anything written outside an
 explicitly-mounted volume disappears on restart, and the kernel does not
@@ -165,13 +162,6 @@ This example deepens material from the project's
   touching call sites
 - **Enberg, *Latency*, ch. 2** — why disk I/O on the request path (file
   logging, rotation) is a latency source a stateless service should avoid
-
-## Linked tutorial sections
-
-- [**§4 Container Strategy: UBI, ubi-micro, multi-stage**]({{ '/docs/04-image-strategy/' | relative_url }}) —
-  the image-and-runtime section: read-only rootfs, tmpfs for scratch,
-  volumes for what must persist, and why the runtime image carries no log
-  directory. This example is the filesystem-discipline half of that section.
 
 ## How it relates to the rest
 

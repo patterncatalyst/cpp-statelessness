@@ -3,7 +3,8 @@ title: The ephemeral filesystem trap
 description: "The container filesystem is ephemeral. The overlayfs layer model, read_only: true as the forcing function, what goes where, logs to stdout, the C++ library traps (spdlog file defaults, crash dumps, ML model caches, coverage data, prometheus_cpp textfiles), restart semantics as a feature."
 order: 8
 layout: tutorial
-sectionid: reference
+sectionid: docs
+part: operational
 ---
 
 # 08 — The Ephemeral Filesystem Trap
@@ -101,7 +102,7 @@ The lifetime contract for each category is explicit. The C++ code can rely on `/
 
 ## Logs go to stdout
 
-The 12-factor logs-as-event-streams principle ([Doc 06 (12-factor)](../06-twelve-factor/)) is the clearest case where C++ instinct collides with container reality. The monolith pattern is to write structured logs to `/var/log/myservice/myservice.log` and let `logrotate` handle rotation. In a container with a read-only rootfs, that write fails. With a writable rootfs, the write succeeds but disappears on restart.
+The 12-factor logs-as-event-streams principle ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})) is the clearest case where C++ instinct collides with container reality. The monolith pattern is to write structured logs to `/var/log/myservice/myservice.log` and let `logrotate` handle rotation. In a container with a read-only rootfs, that write fails. With a writable rootfs, the write succeeds but disappears on restart.
 
 The fix is `stdout`. The container runtime captures the process's stdout and stderr, ships them to a logging driver (Podman's `journald` or `json-file` driver, Kubernetes' container-runtime-managed logs), which forwards to Loki or whatever aggregator the deployment uses. The application does not own log rotation; the orchestrator does.
 
@@ -182,7 +183,7 @@ When the limit is exceeded, the pod is evicted. The eviction is graceful — the
 
 For a C++ service the common path to exceeding the budget is log volume. A service that writes 100 log lines per second at 200 bytes each produces about 1.6 GB per day of log output. Even if the orchestrator ships logs to Loki, the local copy is retained briefly (typically until it hits a per-file size limit and rotates), and rotated files accumulate against the ephemeral-storage budget until they're shipped and deleted.
 
-The mitigations are structural: structured log levels (`info` in production, not `debug`), rate sampling on high-volume events (one in 100 cache-miss messages logged, all errors logged), and ensuring the logging driver ships aggressively enough that rotated files don't accumulate. [Doc 11 (build tooling)](../11-build-tooling/) covers Loki's promtail configuration for the Podman/compose side; Kubernetes uses Fluent Bit or similar.
+The mitigations are structural: structured log levels (`info` in production, not `debug`), rate sampling on high-volume events (one in 100 cache-miss messages logged, all errors logged), and ensuring the logging driver ships aggressively enough that rotated files don't accumulate. [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers Loki's promtail configuration for the Podman/compose side; Kubernetes uses Fluent Bit or similar.
 
 Podman does not have a direct ephemeral-storage limit equivalent. The host filesystem is the limit, and runaway log volume on a development machine fills the disk. The mitigation is the same — structured levels and sampling — but the enforcement is host-level rather than per-container.
 
@@ -245,7 +246,7 @@ The startup check runs after configuration parsing, before the gRPC server start
 
 The data-loss-on-restart property is sometimes treated as a problem to mitigate. It is usually a property to embrace. A service whose state on disk is recoverable only because the same container instance was running for weeks has accumulated implicit state. A deploy, a node failure, a routine rolling restart will surface that state as missing data.
 
-The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)](../07-state-externalization/)). The container's writable storage is for genuinely transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
+The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})). The container's writable storage is for genuinely transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
 
 The exception is services that genuinely own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Podman, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
 
@@ -269,15 +270,15 @@ Run a small startup self-check that verifies the filesystem assumptions match re
 
 ## Cross-references
 
-[Doc 01](../01-deployment-posture/) set up the deployment-posture vocabulary; this document operationalizes one of its implications (containers are interchangeable; their filesystem is too).
+[Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) set up the deployment-posture vocabulary; this document operationalizes one of its implications (containers are interchangeable; their filesystem is too).
 
-[Doc 04](../04-process-scoped-state/) covers ephemeral-storage limits as a category of resource budget, including the Kubernetes accounting model.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers ephemeral-storage limits as a category of resource budget, including the Kubernetes accounting model.
 
-[Doc 06](../06-twelve-factor/) covers the 12-factor logs-as-event-streams principle; this document covers the operational mechanics.
+[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) covers the 12-factor logs-as-event-streams principle; this document covers the operational mechanics.
 
-[Doc 09](../09-health-checks/) covers health checks and the restart semantics that depend on filesystem ephemerality being respected.
+[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) covers health checks and the restart semantics that depend on filesystem ephemerality being respected.
 
-[Doc 11](../11-build-tooling/) (build tooling appendix) covers the Conan recipes and CMake configuration for spdlog and the OTel logging exporter.
+[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) (build tooling appendix) covers the Conan recipes and CMake configuration for spdlog and the OTel logging exporter.
 
 ## Annotated bibliography
 
@@ -298,4 +299,4 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Linux kernel documentation on overlayfs, tmpfs, and the various `mount(2)` options.** Background reading for the layer model and the tmpfs sizing.
 
-**Iglberger, *C++ Software Design*.** The dependency-injection chapter applies to how logging and crash-handling subsystems are wired — configurable sinks rather than hardcoded file paths is the same pattern as configurable backing services in [Doc 07](../07-state-externalization/).
+**Iglberger, *C++ Software Design*.** The dependency-injection chapter applies to how logging and crash-handling subsystems are wired — configurable sinks rather than hardcoded file paths is the same pattern as configurable backing services in [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).

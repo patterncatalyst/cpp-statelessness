@@ -15,11 +15,7 @@ github_path: examples/statelessness/11-build-tooling
 > The full source for this example lives in [`examples/statelessness/11-build-tooling/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/11-build-tooling) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 11 — Build tooling appendix]({{ '/reference/statelessness/11-build-tooling/' | relative_url }})
-
-Tutorial sections:
-[§13 Reproducibility & ABI]({{ '/docs/13-reproducibility-abi/' | relative_url }}) +
-[§12 Static Analysis & Debugging]({{ '/docs/12-analysis-debugging/' | relative_url }})
+[Doc 11 — Build tooling appendix]({{ '/docs/11-build-tooling/' | relative_url }})
 
 Doc 11 is a build-tooling reference — Conan profiles, the library/version
 inventory, the C++23 toolchain matrix, the multi-stage Containerfile pattern,
@@ -179,17 +175,6 @@ This example deepens material from the project's
 - **Enberg, *Latency*, ch. 3** — why the cgroup CPU budget (not the host count)
   is the number that governs scheduling latency, the reason this helper exists
 
-## Linked tutorial sections
-
-- [**§13 Reproducibility & ABI**]({{ '/docs/13-reproducibility-abi/' | relative_url }}) —
-  Conan lockfiles, CMake presets, hermetic builds, and the multi-stage image;
-  this example is a small complete instance of that build discipline, with the
-  gtest gate baked into the build.
-- [**§12 Static Analysis & Debugging**]({{ '/docs/12-analysis-debugging/' | relative_url }}) —
-  the dev/release profile split and the build-as-quality-gate idea; running the
-  test suite as a build stage is the same principle as the static-analysis
-  pipeline there.
-
 ## The build-tooling angle
 
 The example doubles as a small worked instance of Doc 11's build setup: the
@@ -206,7 +191,7 @@ This is the build that produces every other example in the arc. The
 `cgroup_helper` here is the helper the
 [threading example]({{ '/examples/statelessness-05-threading/' | relative_url }})
 relies on to size pools, and the one the capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 uses to size its gRPC server thread pool from the CPU budget. The multi-stage,
 pinned, test-gated build shown here is the pattern every runnable example in
 the compendium is built with.

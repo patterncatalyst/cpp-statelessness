@@ -15,11 +15,7 @@ github_path: examples/statelessness/09-health-checks
 > The full source for this example lives in [`examples/statelessness/09-health-checks/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/09-health-checks) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 09 — Health checks]({{ '/reference/statelessness/09-health-checks/' | relative_url }})
-
-Tutorial sections:
-[§9 Networking & Kernel Parameters]({{ '/docs/09-networking-kernel/' | relative_url }}) +
-[§8 I/O Latency: io_uring, Async gRPC]({{ '/docs/08-io-latency/' | relative_url }})
+[Doc 09 — Health checks]({{ '/docs/09-health-checks/' | relative_url }})
 
 A health check is the orchestrator's API into your service. It decides
 whether to route traffic to a replica, whether to restart a sick one, and
@@ -187,15 +183,6 @@ This example deepens material from the project's
 - **Andrist & Sehr, *C++ High Performance* 2e, ch. 11** — `std::stop_token` and
   `std::jthread` for the cooperative cancellation the shutdown sequence uses
 
-## Linked tutorial sections
-
-- [**§9 Networking & Kernel Parameters**]({{ '/docs/09-networking-kernel/' | relative_url }}) —
-  port binding, the separate liveness/readiness ports, and the network-level
-  behavior of draining connections on shutdown.
-- [**§8 I/O Latency: io_uring, Async gRPC**]({{ '/docs/08-io-latency/' | relative_url }}) —
-  the in-flight-RPC draining on shutdown is an I/O-completion concern; this is
-  where the async-server lifecycle lives.
-
 ## The anti-patterns it is built to avoid
 
 Liveness fails only for what a restart fixes — deadlocks, internal corruption
@@ -210,10 +197,10 @@ of treating health as a designed API rather than a single "is it up?" boolean.
 The shutdown sequence composes the threading section's
 [`std::stop_token`]({{ '/examples/statelessness-05-threading/' | relative_url }})
 cancellation and the
-[process-scope]({{ '/reference/statelessness/04-process-scoped-state/' | relative_url }})
+[process-scope]({{ '/docs/04-process-scoped-state/' | relative_url }})
 reverse-order teardown. The staged-startup gate is the answer to the cold-start
 trap from
-[12-factor]({{ '/reference/statelessness/06-twelve-factor/' | relative_url }}).
+[12-factor]({{ '/docs/06-twelve-factor/' | relative_url }}).
 The capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 reuses this exact health/shutdown sequence and the `health-probe` binary.

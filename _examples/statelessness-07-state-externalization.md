@@ -15,11 +15,7 @@ github_path: examples/statelessness/07-state-externalization
 > The full source for this example lives in [`examples/statelessness/07-state-externalization/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/07-state-externalization) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 07 — State externalization]({{ '/reference/statelessness/07-state-externalization/' | relative_url }})
-
-Tutorial sections:
-[§8 I/O Latency: io_uring, Async gRPC]({{ '/docs/08-io-latency/' | relative_url }}) +
-[§9 Networking & Kernel Parameters]({{ '/docs/09-networking-kernel/' | relative_url }})
+[Doc 07 — State externalization]({{ '/docs/07-state-externalization/' | relative_url }})
 
 The first compendium example with a real backing store. A stateless service
 cannot hold authoritative state in any one replica — the orchestrator can
@@ -185,15 +181,6 @@ This example deepens material from the project's
 - **Andrist & Sehr, *C++ High Performance* 2e, ch. 9** — handling resources
   and the RAII checkout pattern applied to a real network resource
 
-## Linked tutorial sections
-
-- [**§8 I/O Latency: io_uring, Async gRPC**]({{ '/docs/08-io-latency/' | relative_url }}) —
-  the I/O cost model behind connection pooling and deadline propagation; a
-  blocked backing-service call is the latency this section is about.
-- [**§9 Networking & Kernel Parameters**]({{ '/docs/09-networking-kernel/' | relative_url }}) —
-  connection reuse, timeouts, and the kernel-level settings that affect how a
-  pooled database connection behaves under load.
-
 ## Production note
 
 Doc 07 recommends PgBouncer (or pgcat) in front of the database *and* a small
@@ -204,12 +191,12 @@ RAII checkout, exception safety, and deadline propagation in C++.
 ## Where it sits in the compendium
 
 The connection pool here is the process-scoped infrastructure that
-[process-scoped state]({{ '/reference/statelessness/04-process-scoped-state/' | relative_url }})
+[process-scoped state]({{ '/docs/04-process-scoped-state/' | relative_url }})
 owns in `main()`; the RAII checkout is the
 [RAII discipline]({{ '/examples/statelessness-02-raii/' | relative_url }})
 applied to a network resource; and the owned-result pattern is the fix for
 the [PMR lifetime trap]({{ '/examples/statelessness-03-pmr/' | relative_url }}).
 The [outbox example]({{ '/examples/statelessness-07-outbox-pattern/' | relative_url }})
 extends this with atomic event emission, and the capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 reuses this exact `pg_pool.hpp`.

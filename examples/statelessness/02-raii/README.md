@@ -1,7 +1,7 @@
 # statelessness/02-raii — the RequestContext RAII pattern
 
 Compendium reference:
-[Doc 02 — RAII as the foundation for safe stateful work](../../../reference/statelessness/02-raii/)
+[Doc 02 — RAII as the foundation for safe stateful work](../../../_docs/02-raii.md)
 
 A deliberately small gRPC service whose only job is to make the
 **RequestContext** lifecycle visible. It is the runnable companion to
@@ -49,12 +49,12 @@ the exception path alike.
 ## Why this is the first compendium example
 
 RAII request scope is the foundation the other patterns build on:
-process-scoped wiring ([Doc 04](../../../reference/statelessness/04-process-scoped-state/)),
-the PMR arena ([Doc 03](../../../reference/statelessness/03-pmr/)), the
+process-scoped wiring ([Doc 04](../../../_docs/04-process-scoped-state.md)),
+the PMR arena ([Doc 03](../../../_docs/03-pmr.md)), the
 connection pool checkout
-([Doc 07](../../../reference/statelessness/07-state-externalization/)),
+([Doc 07](../../../_docs/07-state-externalization.md)),
 and the graceful-shutdown sequence
-([Doc 09](../../../reference/statelessness/09-health-checks/)) all
+([Doc 09](../../../_docs/09-health-checks.md)) all
 assume this discipline is in place.
 
 ## Running it
@@ -95,8 +95,7 @@ CI verification:
 ## What this example deliberately leaves out
 
 - **Observability.** The lifecycle is visible in plain stdout; no LGTM
-  stack. In production the `span_` would be an OpenTelemetry span — see
-  [§10](../../../docs/10-observability-profiling/) and demo-04.
+  stack. In production the `span_` would be an OpenTelemetry span.
 - **A real connection pool.** The `LeasePool` is a counter, not a
   database client. The dedicated
   [`07-state-externalization`](../07-state-externalization/) example

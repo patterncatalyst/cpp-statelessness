@@ -15,11 +15,7 @@ github_path: examples/statelessness/04-process-scoped-state
 > The full source for this example lives in [`examples/statelessness/04-process-scoped-state/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/04-process-scoped-state) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 04 — Process-scoped state and the State Architecture Table]({{ '/reference/statelessness/04-process-scoped-state/' | relative_url }})
-
-Tutorial sections:
-[§3 RAII & Container Resource Discipline]({{ '/docs/03-raii-discipline/' | relative_url }}) +
-[§7 Memory Management]({{ '/docs/07-memory-management/' | relative_url }})
+[Doc 04 — Process-scoped state and the State Architecture Table]({{ '/docs/04-process-scoped-state/' | relative_url }})
 
 Not all state is request-scoped. A service holds a parsed config, a metrics
 registry, a connection pool, an in-process cache — built once and shared
@@ -194,23 +190,13 @@ This example deepens material from the project's
 - **Enberg, *Latency*, ch. 5** — why bounded, predictable resource use beats
   unbounded caching when latency under a hard memory limit is the goal
 
-## Linked tutorial sections
-
-- [**§3 RAII & Container Resource Discipline**]({{ '/docs/03-raii-discipline/' | relative_url }}) —
-  the reverse-order destruction that gives this example correct teardown for
-  free is the same RAII discipline the section develops, applied at process
-  scope rather than request scope.
-- [**§7 Memory Management**]({{ '/docs/07-memory-management/' | relative_url }}) —
-  bounding process-scoped state against the cgroup memory limit; the LRU
-  cache here is the "bounded by construction" rule from that section.
-
 ## The State Architecture Table, made concrete
 
 | Column | In this example |
 |--------|-----------------|
 | Process-scoped | `ServiceConfig`, `MetricsRegistry`, `BoundedCache` — built in `main()` |
 | Request-scoped | per-`Lookup` locals (see [02-raii]({{ '/examples/statelessness-02-raii/' | relative_url }}) and [03-pmr]({{ '/examples/statelessness-03-pmr/' | relative_url }})) |
-| External | the cache-miss path stands in for a DB/Redis fetch — the real thing is [Doc 07]({{ '/reference/statelessness/07-state-externalization/' | relative_url }}) |
+| External | the cache-miss path stands in for a DB/Redis fetch — the real thing is [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) |
 
 ## Where it sits in the compendium
 
@@ -219,7 +205,7 @@ The composition root owns the lease pool that
 from, holds the request-scoped work from
 [Doc 03]({{ '/examples/statelessness-03-pmr/' | relative_url }}) at arm's
 length, and is where the real connection pool and channel cache from
-[Doc 07]({{ '/reference/statelessness/07-state-externalization/' | relative_url }})
+[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})
 get constructed. The capstone
-([Doc 10]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }}))
+([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))
 is one big composition root.

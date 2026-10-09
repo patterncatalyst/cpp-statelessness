@@ -1,7 +1,7 @@
 # statelessness/04-process-scoped-state — the composition root
 
 Compendium reference:
-[Doc 04 — Process-scoped state and the State Architecture Table](../../../reference/statelessness/04-process-scoped-state/)
+[Doc 04 — Process-scoped state and the State Architecture Table](../../../_docs/04-process-scoped-state.md)
 
 The runnable companion to compendium Doc 04. Not all state is
 request-scoped: a service holds a parsed config, a metrics registry, a

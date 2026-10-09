@@ -3,14 +3,15 @@ title: Authoring notes for compendium extenders
 description: "The framing decisions, per-document research findings, and source anchors that drove the compendium's drafting. Written for contributors who want to extend or revise the compendium — not a first-read for the material itself."
 order: 99
 layout: tutorial
-sectionid: reference
+sectionid: docs
+part: appendix
 ---
 
 # Authoring Notes — Statelessness Compendium
 
 > **This page is for extenders, not first-time readers.** If you're
 > here to learn about statelessness in C++ services, start at the
-> [compendium index]({{ '/reference/statelessness/00-index/' | relative_url }})
+> [compendium index]({{ '/docs/00-index/' | relative_url }})
 > instead — it has the reading guide and the scenario jump table.
 > This page is the authoring record: the framing decisions, the
 > source anchors each document leans on, and the design rationale,

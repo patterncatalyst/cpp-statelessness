@@ -1,7 +1,7 @@
 # statelessness/10-grpc-microservices — the gRPC capstone
 
 Compendium reference:
-[Doc 10 — Microservices with gRPC and C++](../../../reference/statelessness/10-grpc-microservices/)
+[Doc 10 — Microservices with gRPC and C++](../../../_docs/10-grpc-microservices.md)
 
 The integration example. The previous examples each established one pattern
 in isolation; this one composes them into a single realistic gRPC service —

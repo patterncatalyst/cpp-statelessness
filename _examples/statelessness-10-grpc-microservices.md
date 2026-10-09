@@ -15,11 +15,7 @@ github_path: examples/statelessness/10-grpc-microservices
 > The full source for this example lives in [`examples/statelessness/10-grpc-microservices/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/10-grpc-microservices) — clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 10 — Microservices with gRPC and C++]({{ '/reference/statelessness/10-grpc-microservices/' | relative_url }})
-
-Tutorial sections:
-[§8 I/O Latency]({{ '/docs/08-io-latency/' | relative_url }}) +
-[§9 Networking & Kernel Parameters]({{ '/docs/09-networking-kernel/' | relative_url }})
+[Doc 10 — Microservices with gRPC and C++]({{ '/docs/10-grpc-microservices/' | relative_url }})
 
 This is the integration example. The earlier examples each established one
 pattern in isolation; this one composes them into a single realistic gRPC
@@ -188,15 +184,6 @@ This example deepens material from the project's
 - **Andrist & Sehr, *C++ High Performance* 2e, ch. 10-11** — networking,
   channel reuse, and the concurrency model behind the gRPC server and the
   channel cache
-
-## Linked tutorial sections
-
-- [**§8 I/O Latency**]({{ '/docs/08-io-latency/' | relative_url }}) —
-  async gRPC, the cost of each I/O hop, and the deadline budget the capstone
-  propagates from client to database to the tax service.
-- [**§9 Networking & Kernel Parameters**]({{ '/docs/09-networking-kernel/' | relative_url }}) —
-  the multi-service gRPC topology, channel reuse, and the inter-service
-  networking the capstone exercises across the compose network.
 
 ## Where it sits in the compendium
 
