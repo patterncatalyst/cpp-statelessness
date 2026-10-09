@@ -1,35 +1,36 @@
 ---
 layout: default
-title: "Optimizing Modern C++ with Containers"
-description: "A 1.5–3 hour PPTX presentation, an untimed companion Jekyll site, and runnable Podman demos that teach modern-C++ performance under realistic container constraints."
+title: Home
 ---
 
 <section class="hero">
     <div class="container">
-        <span class="hero__eyebrow">Hands-on tutorial</span>
-        <h1>Modern C++ performance,&nbsp;in&nbsp;containers.</h1>
+        <span class="hero__eyebrow">{{ site.brand_emoji }} Reference compendium</span>
+        <h1>Stateless C++20/23 service&nbsp;design,&nbsp;for&nbsp;containers.</h1>
         <p class="hero__lead">
-            Fifteen tutorial sections, runnable Podman demos, an
-            instrumented Grafana stack, and diagrams that explain
-            where C++20/23 performance work actually lives once your
-            code is shipping in an OCI image.
+            An opinionated reference on what makes a C++ service safe to
+            kill, replace, and replicate at an orchestrator's discretion —
+            and how RAII, PMR, threading, and twelve-factor practice either
+            support that property or quietly undermine it. Read it straight
+            through, or jump to the document that answers the question
+            you have right now.
         </p>
         <div class="hero__chips">
-            <span class="chip chip--accent">Fedora 44</span>
+            <span class="chip chip--accent">C++20 / C++23</span>
             <span class="chip">Podman 5.x rootless</span>
-            <span class="chip">GCC 14 / Clang 18</span>
-            <span class="chip">CMake · Conan 2 · Ninja</span>
-            <span class="chip">io_uring · gRPC · OTel</span>
-            <span class="chip">cgroups v2 · NUMA</span>
+            <span class="chip">gRPC</span>
+            <span class="chip">PMR allocators</span>
+            <span class="chip">12-Factor</span>
+            <span class="chip">OpenTelemetry</span>
         </div>
         <div class="hero__cta">
             <a class="btn btn--primary"
-               href="{{ '/docs/00-outline/' | relative_url }}">
-                Start with the outline →
+               href="{{ '/docs/00-index/' | relative_url }}">
+                Start with the index →
             </a>
             <a class="btn btn--secondary"
-               href="{{ '/docs/01-prerequisites/' | relative_url }}">
-                Skip to prerequisites
+               href="{{ '/docs/01-deployment-posture/' | relative_url }}">
+                Skip to deployment posture
             </a>
         </div>
     </div>
@@ -39,20 +40,20 @@ description: "A 1.5–3 hour PPTX presentation, an untimed companion Jekyll site
     <div class="container">
         <div class="stats">
             <div class="stat">
-                <span class="stat__value">15</span>
-                <span class="stat__label">Tutorial sections</span>
+                <span class="stat__value">11</span>
+                <span class="stat__label">Chapters, plus a build-tooling appendix</span>
             </div>
             <div class="stat">
-                <span class="stat__value">7</span>
-                <span class="stat__label">Runnable Podman demos</span>
+                <span class="stat__value">10</span>
+                <span class="stat__label">Runnable Podman examples</span>
             </div>
             <div class="stat">
-                <span class="stat__value">1.5–3h</span>
-                <span class="stat__label">PPTX talk-time range</span>
+                <span class="stat__value">2</span>
+                <span class="stat__label">Companion decks — 101 on-ramp and 201 compendium</span>
             </div>
             <div class="stat">
-                <span class="stat__value">4</span>
-                <span class="stat__label">Reference books cited</span>
+                <span class="stat__value">13</span>
+                <span class="stat__label">Architecture and flow diagrams</span>
             </div>
         </div>
     </div>
@@ -60,40 +61,28 @@ description: "A 1.5–3 hour PPTX presentation, an untimed companion Jekyll site
 
 <section class="section">
     <div class="container">
-        <h2 class="section-heading">Tutorial</h2>
+        <h2 class="section-heading">The parts</h2>
         <p class="section-sub">
-            Read in order the first time. Each section ends with a
-            prev/next pager. Per-section duration is reading time for
-            the site; the PPTX deck has its own talk-time pacing.
+            Seven parts, read in order the first time. Each part page
+            lists its chapters; each chapter stands on its own for a
+            reader jumping in to solve one problem. The orientation part
+            is the map — start there if you only have time for one page.
         </p>
         <div class="cards">
-            {%- assign tutorial_docs = site.docs | sort: "order" -%}
-            {%- for doc in tutorial_docs -%}
-                {%- case doc.order -%}
-                    {%- when 0 -%}{%- assign section_kind = "Map" -%}
-                    {%- when 1 -%}{%- assign section_kind = "Setup" -%}
-                    {%- when 2 -%}{%- assign section_kind = "Concepts" -%}
-                    {%- when 3, 4 -%}{%- assign section_kind = "Build" -%}
-                    {%- when 5, 6 -%}{%- assign section_kind = "Memory" -%}
-                    {%- when 7, 8 -%}{%- assign section_kind = "I/O" -%}
-                    {%- when 9 -%}{%- assign section_kind = "Observe" -%}
-                    {%- when 10 -%}{%- assign section_kind = "Isolate" -%}
-                    {%- when 11, 12 -%}{%- assign section_kind = "Quality" -%}
-                    {%- when 13 -%}{%- assign section_kind = "Pitfalls" -%}
-                    {%- when 14 -%}{%- assign section_kind = "Next" -%}
-                    {%- else -%}{%- assign section_kind = "Section" -%}
-                {%- endcase -%}
-                <a class="card" href="{{ doc.url | relative_url }}">
-                    <div class="card__eyebrow">
-                        {{ section_kind }}
-                    </div>
-                    <h3 class="card__title">
-                        <span class="card__num">{{ doc.order | prepend: '0' | slice: -2, 2 }}</span>
-                        {{ doc.title }}
-                    </h3>
-                    <p class="card__desc">{{ doc.description }}</p>
+            {%- assign parts_sorted = site.parts | sort: "order" -%}
+            {%- for part in parts_sorted -%}
+                {%- assign part_docs = site.docs | where: "part", part.part_name -%}
+                <a class="card" href="{{ part.url | relative_url }}">
+                    <div class="card__eyebrow">Part {{ part.order }}</div>
+                    <h3 class="card__title">{{ part.title }}</h3>
+                    {%- if part.blurb -%}
+                        <p class="card__desc">{{ part.blurb }}</p>
+                    {%- endif -%}
                     <div class="card__meta">
-                        {%- if doc.duration -%}<span>⏱ {{ doc.duration }}</span>{%- endif -%}
+                        {%- if part_docs.size > 0 -%}
+                            <span>{{ part_docs.size }} chapter{% if part_docs.size != 1 %}s{% endif %}</span>
+                        {%- endif -%}
+                        <span>Explore →</span>
                     </div>
                 </a>
             {%- endfor -%}
@@ -103,53 +92,54 @@ description: "A 1.5–3 hour PPTX presentation, an untimed companion Jekyll site
 
 <section class="section" style="background: var(--bg-soft);">
     <div class="container">
-        <h2 class="section-heading">Reference</h2>
+        <h2 class="section-heading">Everything else on the site</h2>
         <p class="section-sub">
-            Out-of-band documents that support the tutorial. Read the
-            plan if something doesn't work as written — chances are
-            it's tracked there.
+            The chapters are the core; these round it out — runnable
+            proof for every claim, the diagrams that explain the
+            architecture, the books behind the opinions, and the two
+            decks for presenting the material.
         </p>
         <div class="cards">
-            <a class="doc-card" href="{{ '/docs/00-outline/' | relative_url }}">
+            <a class="doc-card" href="{{ '/docs/00-index/' | relative_url }}">
                 <span class="doc-card__icon" aria-hidden="true">🗺️</span>
                 <span>
-                    <span class="doc-card__title">Outline &amp; reading order</span>
-                    <span class="doc-card__desc">The whole map on one page — section coverage, what's in scope, the 1.5h vs 3h PPTX cuts.</span>
-                </span>
-            </a>
-            <a class="doc-card" href="{{ '/docs/01-prerequisites/' | relative_url }}">
-                <span class="doc-card__icon" aria-hidden="true">🧰</span>
-                <span>
-                    <span class="doc-card__title">Prerequisites — Fedora 44</span>
-                    <span class="doc-card__desc">Podman 5.x rootless, GCC 14 / Clang 18, Conan 2, CMake, Ninja, hey, jq — full install.</span>
-                </span>
-            </a>
-            <a class="doc-card" href="{{ '/diagrams/' | relative_url }}">
-                <span class="doc-card__icon" aria-hidden="true">📐</span>
-                <span>
-                    <span class="doc-card__title">Excalidraw diagrams</span>
-                    <span class="doc-card__desc">Architecture and flow diagrams in an embedded gallery — click for fullscreen, download .excalidraw to edit.</span>
+                    <span class="doc-card__title">Index &amp; reading guide</span>
+                    <span class="doc-card__desc">The full map — reading order, a scenario guide, the State Architecture Table, and the consolidated bibliography.</span>
                 </span>
             </a>
             <a class="doc-card" href="{{ '/examples/' | relative_url }}">
                 <span class="doc-card__icon" aria-hidden="true">📦</span>
                 <span>
-                    <span class="doc-card__title">Runnable demos</span>
-                    <span class="doc-card__desc">image strategy · STL &amp; layout · io_uring + gRPC · observability · noisy neighbors · memory &amp; allocators · quality pipeline.</span>
+                    <span class="doc-card__title">Runnable examples</span>
+                    <span class="doc-card__desc">Ten self-contained Podman demos, one per chapter from RAII through the gRPC capstone — each proves a claim the chapters make.</span>
                 </span>
             </a>
-            <a class="doc-card" href="{{ '/docs/15-where-to-go-next/' | relative_url }}">
+            <a class="doc-card" href="{{ '/diagrams/' | relative_url }}">
+                <span class="doc-card__icon" aria-hidden="true">📐</span>
+                <span>
+                    <span class="doc-card__title">Diagrams</span>
+                    <span class="doc-card__desc">Thirteen architecture and flow diagrams in an embedded gallery — click for fullscreen, download the .excalidraw source to edit.</span>
+                </span>
+            </a>
+            <a class="doc-card" href="{{ '/bibliography/' | relative_url }}">
                 <span class="doc-card__icon" aria-hidden="true">📚</span>
                 <span>
-                    <span class="doc-card__title">Reference books cited</span>
-                    <span class="doc-card__desc">Andrist &amp; Sehr · Iglberger · Enberg · Ghosh — and how each complements this tutorial.</span>
+                    <span class="doc-card__title">Bibliography</span>
+                    <span class="doc-card__desc">The books behind the opinions, annotated, with a chapter-by-chapter cross-reference of which book backs which claim.</span>
                 </span>
             </a>
-            <a class="doc-card" href="{{ '/reference/statelessness/' | relative_url }}">
+            <a class="doc-card" href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/blob/main/presentation/cpp-statelessness-101.pptx" rel="noopener">
+                <span class="doc-card__icon" aria-hidden="true">🎤</span>
+                <span>
+                    <span class="doc-card__title">Deck — 101 on-ramp</span>
+                    <span class="doc-card__desc">The C++-lite talk: statelessness as a deployment property, for an audience that doesn't live in C++ day to day.</span>
+                </span>
+            </a>
+            <a class="doc-card" href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/blob/main/presentation/cpp-statelessness-compendium.pptx" rel="noopener">
                 <span class="doc-card__icon" aria-hidden="true">🏛️</span>
                 <span>
-                    <span class="doc-card__title">Statelessness compendium</span>
-                    <span class="doc-card__desc">Companion compendium on C++20/23 service design for Linux containers — deployment posture, RAII, PMR, threading, 12-factor, gRPC capstone, build tooling appendix. Statelessness as the through-line.</span>
+                    <span class="doc-card__title">Deck — 201 compendium</span>
+                    <span class="doc-card__desc">The deep deck, structured like the site itself — a slide per chapter's core pattern, for a C++ audience.</span>
                 </span>
             </a>
         </div>
