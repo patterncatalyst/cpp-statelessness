@@ -1,0 +1,68 @@
+# Observability stack — grafana/otel-lgtm (all-in-one).
+#
+# Bring up standalone:
+#   podman compose -f observability/compose.yml up -d
+#
+# Or include from a demo's compose.yml via:
+#   podman compose -f compose.yml -f observability/compose.yml up
+#
+# Why one image instead of six:
+# `grafana/otel-lgtm` bundles Grafana, Loki, Tempo, Prometheus, and an
+# OTel Collector into a single container. For a tutorial this is the
+# right call — you get the same OTLP endpoint, the same dashboards,
+# the same query languages, with a fraction of the moving parts and a
+# single image to pull. The reference repo
+# patterncatalyst/otel-observability-demos uses this exact pattern.
+#
+# Trade-off: in production you'd run each component separately so you
+# can scale and tune them independently. The tutorial covers that
+# architecture in §9; the all-in-one is the running example.
+#
+# Image policy: this image is the documented exception covered in
+# CONTRIBUTING.md → Container image policy. Grafana Labs publishes
+# only to Docker Hub; UBI / Quay alternatives don't exist for this
+# bundle.
+
+services:
+  lgtm:
+    image: docker.io/grafana/otel-lgtm:0.8.1
+    container_name: tutorial-lgtm
+    ports:
+      - "127.0.0.1:3000:3000"   # Grafana UI
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:9090:9090"   # Prometheus UI (handy for ad-hoc PromQL)
+      - "127.0.0.1:3100:3100"   # Loki HTTP API (handy for LogCLI)
+      - "127.0.0.1:3200:3200"   # Tempo HTTP API
+    environment:
+      # Grafana: anonymous viewer so the audience can browse without
+      # typing a password.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor"
+    # Grafana stores its sqlite state under /data; in rootless podman
+    # bind mounts can hit ownership issues, so use tmpfs and run the
+    # bundled Grafana as root inside the container. Hard-won fix from
+    # patterncatalyst/otel-observability-demos.
+    user: root
+    tmpfs:
+      - /data
+    volumes:
+      # Pre-built dashboards → the 'Tutorial' folder in Grafana, plus the
+      # provider yaml that actually tells Grafana to load them.
+      #
+      # These paths are absolute via env vars because relative paths in a
+      # compose file resolve against the PROJECT directory — which, when this
+      # file is included from a demo (podman compose -f <demo> -f <this>), is
+      # the DEMO's directory, not observability/. The demos export
+      # OBS_DASHBOARDS_DIR / OBS_PROVIDER_FILE to absolute paths; the defaults
+      # below are correct for a standalone `compose -f observability/compose.yml`.
+      - ${OBS_DASHBOARDS_DIR:-./grafana/dashboards}:/otel-lgtm/grafana/conf/provisioning/dashboards/tutorial:ro,Z
+      - ${OBS_PROVIDER_FILE:-./grafana/otel-provisioning/tutorial-dashboards.yaml}:/otel-lgtm/grafana/conf/provisioning/dashboards/tutorial-dashboards.yaml:ro,Z
+    networks:
+      - obs
+
+networks:
+  obs:
+    name: tutorial-obs
+    external: false

@@ -1,0 +1,199 @@
+---
+layout: default
+title: Excalidraw diagrams
+description: Architecture and flow diagrams for the tutorial. Each diagram renders inline; click for a fullscreen view, or download the .excalidraw source to edit.
+permalink: /diagrams/
+---
+
+<section class="hero hero--compact">
+    <div class="container">
+        <span class="hero__eyebrow">Reference</span>
+        <h1>Excalidraw diagrams.</h1>
+        <p class="hero__lead">
+            Architecture and flow diagrams for the tutorial. Click any
+            diagram to open it fullscreen. Each is also available as
+            <code>.excalidraw</code> source — open it on
+            <a href="https://excalidraw.com" rel="noopener">excalidraw.com</a>
+            to edit.
+        </p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="gallery">
+            {% include diagram-card.html
+                file="01-prerequisites-toolchain"
+                section="§1"
+                title="Toolchain layout"
+                caption="What gets installed where: Fedora packages, toolchain, Conan, Podman storage." %}
+
+            {% include diagram-card.html
+                file="02-introduction-four-layers"
+                section="§2"
+                title="The four-layer mental model"
+                caption="The four-layer model: toolchain, image, kernel, runtime." %}
+
+            {% include diagram-card.html
+                file="02-threading-models"
+                section="§2"
+                title="Threading models in C++"
+                caption="Threading models by stack model, kernel visibility, and I/O- vs CPU-bound fit." %}
+
+            {% include diagram-card.html
+                file="03-raii-discipline"
+                section="§3"
+                title="RAII vs manual cleanup"
+                caption="RAII vs manual cleanup: destructors fire on every exit path." %}
+
+            {% include diagram-card.html
+                file="04-image-strategy-multistage"
+                section="§4"
+                title="Multi-stage image strategy"
+                caption="Single-stage vs multi-stage Containerfile." %}
+
+            {% include diagram-card.html
+                file="05-compile-time-pgo-flow"
+                section="§5"
+                title="LTO and PGO build flow"
+                caption="Three-pass PGO: instrument → profile → optimize." %}
+
+            {% include diagram-card.html
+                file="06-stl-layout-flat-vs-node"
+                section="§6"
+                title="Flat vs node containers"
+                caption="Memory layout: contiguous vector vs node-based containers." %}
+
+            {% include diagram-card.html
+                file="07-allocator-stack"
+                section="§7"
+                title="Allocator stack"
+                caption="Allocator stack: app → PMR → malloc → page cache → cgroups → host." %}
+
+            {% include diagram-card.html
+                file="08-io-uring-rings"
+                section="§8"
+                title="io_uring submission/completion"
+                caption="io_uring SQ/CQ rings in shared memory." %}
+
+            {% include diagram-card.html
+                file="09-networking-veth-vs-host"
+                section="§9"
+                title="Container networking modes"
+                caption="Packet path: veth+bridge vs slirp4netns vs --network=host." %}
+
+            {% include diagram-card.html
+                file="10-observability-otel-stack"
+                section="§10"
+                title="Observability stack"
+                caption="OTel pipeline: C++ → OTel SDK → OTLP → Grafana stack." %}
+
+            {% include diagram-card.html
+                file="11-isolation-cgroup-tree"
+                section="§11"
+                title="cgroup v2 weight & cpuset"
+                caption="Two-tenant cgroup hierarchy with delegated controllers." %}
+
+            {% include diagram-card.html
+                file="11-numa-local-remote"
+                section="§11"
+                title="NUMA local vs remote"
+                caption="Local memory ~100ns; crossing the interconnect to the other node is ~1.5-2x slower. Pin cpuset.cpus + cpuset.mems." %}
+
+            {% include diagram-card.html
+                file="12-debug-sidecar-pattern"
+                section="§12"
+                title="Ephemeral gdb sidecar"
+                caption="Ephemeral gdb sidecar sharing the service's PID namespace." %}
+
+            {% include diagram-card.html
+                file="13-reproducibility-conan-flow"
+                section="§13"
+                title="Hermetic build pipeline"
+                caption="Hermetic build: Conan → CMake/Ninja → reproducible binary." %}
+
+            {% include diagram-card.html
+                file="13-abi-break-taxonomy"
+                section="§13"
+                title="ABI break taxonomy"
+                caption="What is safe to change vs what breaks the binary contract (layout, vtable, signatures) — bump the SONAME, catch with abidiff." %}
+
+            {% include diagram-card.html
+                file="14-pitfalls-avx512-mismatch"
+                section="§14"
+                title="The AVX-512 mismatch trap"
+                caption="AVX-512 mismatch: build host has it, runtime doesn't → SIGILL." %}
+        </div>
+    </div>
+</section>
+
+{%- comment -%}
+Fullscreen modal — populated by JS when a card is clicked.
+Identical pattern to hummingbird-tutorial; kept verbatim so future
+scripted updates can apply the same patches in both places.
+{%- endcomment -%}
+<div id="diagram-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="modal__close" type="button" aria-label="Close fullscreen">×</button>
+    <div class="modal__inner">
+        <div class="modal__header">
+            <h2 class="modal__title" id="modal-title"></h2>
+            <p class="modal__caption"></p>
+        </div>
+        <div class="modal__viewer">
+            <object class="modal__svg" type="image/svg+xml" aria-label="Diagram"></object>
+        </div>
+        <div class="modal__actions">
+            <a class="btn btn--secondary modal__download" download>Download .excalidraw</a>
+            <a class="btn btn--secondary"
+               href="https://excalidraw.com" target="_blank" rel="noopener">Open excalidraw.com</a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modal = document.getElementById('diagram-modal');
+    if (!modal) return;
+    var modalSvg   = modal.querySelector('.modal__svg');
+    var modalTitle = modal.querySelector('.modal__title');
+    var modalCap   = modal.querySelector('.modal__caption');
+    var modalDl    = modal.querySelector('.modal__download');
+    var closeBtn   = modal.querySelector('.modal__close');
+
+    function open(card) {
+        var svg     = card.dataset.svg;
+        var src     = card.dataset.source;
+        var title   = card.dataset.title;
+        var caption = card.dataset.caption;
+        modalSvg.setAttribute('data', svg);
+        modalDl.setAttribute('href', src);
+        modalTitle.textContent = title;
+        modalCap.textContent   = caption || '';
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        closeBtn.focus();
+    }
+    function close() {
+        modal.hidden = true;
+        modalSvg.setAttribute('data', '');           // unload to free memory
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.gallery-card__viewer').forEach(function (el) {
+        el.addEventListener('click', function () { open(el.closest('.gallery-card')); });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open(el.closest('.gallery-card'));
+            }
+        });
+    });
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) close();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) close();
+    });
+})();
+</script>

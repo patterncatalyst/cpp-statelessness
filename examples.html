@@ -1,0 +1,106 @@
+---
+layout: default
+title: Example demos
+description: Runnable companion demos covering image strategy, STL & layout, I/O, observability, isolation, memory, the quality pipeline, and the statelessness compendium (RAII, PMR, externalization, health checks, the gRPC capstone). Each runs via ./demo.sh on Fedora 44.
+permalink: /examples/
+---
+
+<section class="hero hero--compact">
+    <div class="container">
+        <span class="hero__eyebrow">Example demos</span>
+        <h1>Runnable companions to the tutorial.</h1>
+        <p class="hero__lead">
+            Every claim made in the tutorial body has a demo behind it.
+            Each demo is a self-contained Podman project with its own
+            <code>./demo.sh</code>, its own Containerfile(s), and the
+            CMake / Conan plumbing to build hermetically. Read the
+            matching tutorial section for context, then run the demo
+            from its directory.
+        </p>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="section-heading">Demos</h2>
+        <p class="section-sub">
+            Each card links to the demo's page on this site (a
+            rendering of the README with cross-references), and each
+            page links to the source on GitHub. Each demo also stands
+            alone — run it without reading the tutorial first if you'd
+            rather poke at it directly.
+        </p>
+
+        <div class="cards">
+        {%- assign sorted_examples = site.examples | sort: "order" -%}
+        {%- for e in sorted_examples -%}
+        {%- if e.order < 100 -%}
+            <a class="card" href="{{ e.url | relative_url }}">
+                <div class="card__eyebrow">{{ e.card_eyebrow }}</div>
+                <h3 class="card__title">{{ e.card_title }}</h3>
+                <p class="card__desc">{{ e.card_blurb }}</p>
+                <div class="card__meta"><span>Read page &rarr;</span></div>
+            </a>
+        {%- endif -%}
+        {%- endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="section-heading">Compendium examples</h2>
+        <p class="section-lead">
+            Runnable companions to the
+            <a href="{{ '/reference/statelessness/00-index/' | relative_url }}">statelessness compendium</a>.
+            Each one makes a single pattern from the compendium concrete
+            and runnable; they share the main demos' one-command
+            <code>./demo.sh</code> shape.
+        </p>
+        <div class="cards">
+        {%- assign sorted_examples = site.examples | sort: "order" -%}
+        {%- for e in sorted_examples -%}
+        {%- if e.order >= 200 -%}
+            <a class="card" href="{{ e.url | relative_url }}">
+                <div class="card__eyebrow">{{ e.card_eyebrow }}</div>
+                <h3 class="card__title">{{ e.card_title }}</h3>
+                <p class="card__desc">{{ e.card_blurb }}</p>
+                <div class="card__meta"><span>Read page &rarr;</span></div>
+            </a>
+        {%- endif -%}
+        {%- endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="section" style="background: var(--bg-soft);">
+    <div class="container container-prose">
+        <h2 class="section-heading">Running every demo</h2>
+        <p>
+            Clone the repo and invoke each <code>demo.sh</code> from its
+            directory. The scripts assume Podman 5.x rootless and a
+            handful of host tools (<code>hey</code>, <code>jq</code>,
+            <code>curl</code>) — see <a href="{{ '/docs/01-prerequisites/' | relative_url }}">§1
+            Prerequisites</a> for the full list.
+        </p>
+<pre><code>git clone https://github.com/{{ site.github_username }}/{{ site.github_repo }}.git
+cd {{ site.github_repo }}/examples/demo-01-image-strategy
+./demo.sh
+# ... or run them all in sequence:
+cd {{ site.github_repo }}
+./scripts/test-all-demos.sh
+# ... or just the statelessness compendium examples:
+./scripts/test-all-stateless-demos.sh
+</code></pre>
+
+        <h2 class="section-heading">If a demo fails</h2>
+        <p>
+            Most failures are kernel-feature gaps (<code>io_uring</code>
+            multishot needs ≥ 5.19) or rootless cgroup limits. The
+            <a href="{{ '/plans/reconciliation-plan/' | relative_url }}">reconciliation plan</a>
+            tracks every demo's verification state per host class. If
+            your host isn't covered, an entry there is the right
+            contribution.
+        </p>
+    </div>
+</section>
