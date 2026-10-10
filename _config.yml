@@ -3,7 +3,7 @@ title: "Stateless C++ Services"
 description: >-
     An opinionated reference on stateless C++20/23 service design for Linux
     containers — 11 chapters plus a build-tooling appendix, 10 runnable
-    Podman examples, and two companion decks.
+    Docker examples, and two companion decks.
 author: cpp-statelessness contributors
 brand_emoji: "🏛️"
 
@@ -32,7 +32,7 @@ kramdown:
 
 # ── Collections ───────────────────────────────────────────────────────────────
 # `docs` is the compendium body, grouped into `parts` for two-level
-# navigation (Home → Part → Chapter). `examples` are the runnable Podman
+# navigation (Home → Part → Chapter). `examples` are the runnable Docker
 # demos. `plans` is project-management material — included in the build so
 # it can be cross-linked, but not advertised in the main nav.
 collections:
