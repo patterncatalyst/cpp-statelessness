@@ -15,7 +15,7 @@ gate) assert on specific transcript markers.
 | 1 | 07-outbox-pattern (never host-built) | scripts/test-stateless-demo-07-outbox-pattern.sh | PASS — reached final log_ok line, no exit 1 hit (set -euo pipefail) |
 | 2 | 09-health-checks | examples/.../09-health-checks/demo.sh (grep) | PASS — liveness 200 throughout, readiness NOT_SERVING↔SERVING on SIGUSR1x2, ordered shutdown exit 0 |
 | 3 | 10-grpc-microservices | examples/.../10-grpc-microservices/demo.sh (grep) | PASS — Act1 subtotal=8948 tax=626 (~7%) total=9574; Act2 carol tax=0 no tax call; Act3 replay same order_id |
-| 4 | 11-build-tooling | examples/.../11-build-tooling/demo.sh (grep); --clean after | pending |
+| 4 | 11-build-tooling | examples/.../11-build-tooling/demo.sh (grep); --clean after | PASS — gtest 15/15; cpu 22→1.5→0.5 w/ hw_concurrency=22, mem=256.0MiB; --clean ran |
 | 5 | 02-raii | scripts/test-stateless-demo-02-raii.sh | pending |
 | 6 | 03-pmr | scripts/test-stateless-demo-03-pmr.sh (require literal heap-use-after-free) | pending |
 | 7 | 04-process-scoped-state | scripts/test-stateless-demo-04-process-scoped-state.sh | pending |
