@@ -1,7 +1,7 @@
 // tax_svc.cpp — the tax-calculation upstream (Doc 10).
 //
 // A small standalone gRPC service the pricing service calls. It exists so
-// the capstone's outbound-call story — channel cache, deadline propagation,
+// the end-to-end example's outbound-call story — channel cache, deadline propagation,
 // error translation — is demonstrated against a REAL upstream rather than a
 // mock. It computes a flat per-country rate; the logic is deliberately
 // trivial, the point is the wiring.

@@ -50,7 +50,7 @@ generate_grpc(pricing)
 generate_grpc(tax)
 generate_grpc(health)
 
-# ── pricing-svc: the capstone (gRPC + libpq; calls tax over gRPC) ──
+# ── pricing-svc: the end-to-end example (gRPC + libpq; calls tax over gRPC) ──
 add_executable(pricing-svc
     src/pricing_svc.cpp
     ${GENERATED_DIR}/pricing.pb.cc ${GENERATED_DIR}/pricing.grpc.pb.cc
