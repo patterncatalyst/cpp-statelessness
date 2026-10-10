@@ -74,6 +74,7 @@ _site/
 Testing/
 # Test outputs
 test-results/
+.verify-transcripts/
 Thumbs.db
 vendor/
 .venv/
