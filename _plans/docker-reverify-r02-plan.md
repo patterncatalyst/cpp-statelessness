@@ -21,7 +21,7 @@ gate) assert on specific transcript markers.
 | 7 | 04-process-scoped-state | scripts/test-stateless-demo-04-process-scoped-state.sh | PASS — exit 0 + "composition root, bounded cache, reverse teardown"; cache 4/4 w/ 4 evictions |
 | 8 | 07-state-externalization | scripts/test-stateless-demo-07-state-externalization.sh | PASS — exit 0 + "pool RAII, DB-authoritative idempotency, read-back"; fresh/replay/distinct/read-back all correct |
 | 9 | 08-ephemeral-filesystem | scripts/test-stateless-demo-08-ephemeral-filesystem.sh | PASS — exit 0 + "verified"; file logger EROFS under --read-only, stdout + tmpfs scratch both succeeded |
-| 10 | 05-threading (prior smoke pass) | scripts/test-stateless-demo-05-threading.sh | pending |
+| 10 | 05-threading (prior smoke pass) | scripts/test-stateless-demo-05-threading.sh | PASS — exit 0 + "verified"; hw_concurrency=22, cgroup quota=2 under --cpus=2, throughput quota-bound (3205 vs 3189/s) |
 
 Run each from repo root: `DEMO_NO_PAUSE=1 bash <driver> 2>&1 | tee .verify-transcripts/<demo>.log; echo "rc=${PIPESTATUS[0]}"`.
 Guard each run: `docker ps` confirms 50051 free first. Never interrupt a build (poisons conan cache).
