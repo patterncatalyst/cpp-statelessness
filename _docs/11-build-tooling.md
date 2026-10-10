@@ -394,7 +394,7 @@ ENTRYPOINT ["/usr/local/bin/pricing_service"]
 
 A few choices to call out. The build stage uses the full Fedora image; the runtime stage uses `fedora-minimal` which is much smaller. The binary is stripped after build to remove debug symbols (production debugging uses separate symbol files shipped to a symbol server, not symbols in the running image). `grpc_health_probe` comes from the gRPC ecosystem's prebuilt binary release — adding a few MB to the image, far less than building it from source.
 
-The `USER 1000` directive matches the `runAsUser: 1000` from the Kubernetes manifest in [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}). Running as a non-root UID inside the container is independent of the rootless-Podman story ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})) but layers on the same defense-in-depth.
+The `USER 1000` directive matches the `runAsUser: 1000` from the Kubernetes manifest in [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}). Running as a non-root UID inside the container is independent of the rootless-Docker story ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})) but layers on the same defense-in-depth.
 
 For a smaller image, switch the runtime base to `distroless` (Google's stripped-down image) or build a static binary against musl libc and use `scratch` as the base. The trade-off is that distroless and scratch images are harder to debug interactively; for a development-side compose file, the full Fedora image is more friendly.
 
@@ -649,7 +649,7 @@ include(GoogleTest)
 gtest_discover_tests(unit_tests)
 ```
 
-For backing-service-dependent tests (PgPool, Redis access), the standard pattern is to spin up the dependency in a sidecar container during the test run — testcontainers-cpp is the C++ equivalent of the Java testcontainers library and integrates with Conan via its own recipe. Alternatively, run the test container under podman-compose and have the test binary connect to it.
+For backing-service-dependent tests (PgPool, Redis access), the standard pattern is to spin up the dependency in a sidecar container during the test run — testcontainers-cpp is the C++ equivalent of the Java testcontainers library and integrates with Conan via its own recipe. Alternatively, run the test container under Docker Compose and have the test binary connect to it.
 
 For unit tests of pure C++ code — the `RequestContext` lifecycle, `ChannelCache` insertion logic, idempotency key handling — GoogleTest is sufficient on its own. Mock the gRPC and backing-service interfaces at the seam, test the logic in isolation.
 
@@ -683,7 +683,7 @@ Vendor small helpers (cgroup detection, PSI parsing, OTel context propagation) u
 
 Wire AddressSanitizer in the dev profile. Most arena lifetime bugs, RAII inversions, and `co_await` UB cases that the prior documents warned about surface immediately under ASan, before they reach production.
 
-Test with GoogleTest (or Catch2) for unit tests. Use testcontainers-cpp or podman-compose for backing-service integration tests. Run both in CI.
+Test with GoogleTest (or Catch2) for unit tests. Use testcontainers-cpp or Docker Compose for backing-service integration tests. Run both in CI.
 
 ## Cross-references
 

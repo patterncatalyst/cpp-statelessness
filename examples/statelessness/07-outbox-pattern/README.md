@@ -50,8 +50,8 @@ exceptions without a C++ binding.
 
 ## Prerequisites
 
-- **podman** with the `podman compose` provider, and **curl** (the demo
-  and test use them).
+- **Docker** with the Docker Compose plugin (`docker compose`), and **curl**
+  (the demo and test use them).
 - **kcat** *(optional)* — only to dump the Kafka topic from the host in
   Act 2 of the demo. On Fedora:
 

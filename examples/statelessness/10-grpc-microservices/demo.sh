@@ -15,12 +15,12 @@
 #   3. Idempotent replay      — re-send act 1's key: the stored result comes
 #                              back without recomputing (Doc 07).
 #
-# Calls go through the in-image pricing-client via `podman exec` — no host
+# Calls go through the in-image pricing-client via `docker exec` — no host
 # gRPC tooling needed.
 
 set -euo pipefail
 
-COMPOSE="podman compose -f compose.yml"
+COMPOSE="docker compose -f compose.yml"
 PRICING="stateless-10-pricing"
 
 if [[ "${1:-}" == "--clean" ]]; then
@@ -34,14 +34,14 @@ cleanup() { [[ $KEEP -eq 1 ]] || { echo; echo "==> Tearing down (use --keep to l
 trap cleanup EXIT
 
 # pricing-client <addr> <idem_key> <customer> <product:qty>...
-price() { podman exec "$PRICING" /usr/local/bin/pricing-client localhost:50051 "$@"; }
+price() { docker exec "$PRICING" /usr/local/bin/pricing-client localhost:50051 "$@"; }
 
 echo "==> Building and starting postgres + tax-svc + pricing-svc"
 $COMPOSE up -d --build
 
 echo "    waiting for pricing-svc to report ready ..."
 for _ in $(seq 1 40); do
-    podman exec "$PRICING" /usr/local/bin/health-probe localhost:50051 pricing.v1.Pricing 2>/dev/null | grep -q "SERVING" && break
+    docker exec "$PRICING" /usr/local/bin/health-probe localhost:50051 pricing.v1.Pricing 2>/dev/null | grep -q "SERVING" && break
     sleep 0.5
 done
 echo "    ready"

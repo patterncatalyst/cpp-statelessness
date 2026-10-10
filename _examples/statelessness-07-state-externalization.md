@@ -91,7 +91,7 @@ CI verification: `scripts/test-stateless-demo-07-state-externalization.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Podman 5.x — create an order,
+Representative output on a Fedora 44 host with Docker 29.x — create an order,
 replay the same idempotency key, then read it back:
 
 ```

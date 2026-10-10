@@ -1,10 +1,10 @@
 # Observability stack — grafana/otel-lgtm (all-in-one).
 #
 # Bring up standalone:
-#   podman compose -f observability/compose.yml up -d
+#   docker compose -f observability/compose.yml up -d
 #
 # Or include from a demo's compose.yml via:
-#   podman compose -f compose.yml -f observability/compose.yml up
+#   docker compose -f compose.yml -f observability/compose.yml up
 #
 # Why one image instead of six:
 # `grafana/otel-lgtm` bundles Grafana, Loki, Tempo, Prometheus, and an
@@ -40,7 +40,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor"
-    # Grafana stores its sqlite state under /data; in rootless podman
+    # Grafana stores its sqlite state under /data; in a rootless engine
     # bind mounts can hit ownership issues, so use tmpfs and run the
     # bundled Grafana as root inside the container. Hard-won fix from
     # patterncatalyst/otel-observability-demos.
@@ -53,7 +53,7 @@ services:
       #
       # These paths are absolute via env vars because relative paths in a
       # compose file resolve against the PROJECT directory — which, when this
-      # file is included from a demo (podman compose -f <demo> -f <this>), is
+      # file is included from a demo (docker compose -f <demo> -f <this>), is
       # the DEMO's directory, not observability/. The demos export
       # OBS_DASHBOARDS_DIR / OBS_PROVIDER_FILE to absolute paths; the defaults
       # below are correct for a standalone `compose -f observability/compose.yml`.

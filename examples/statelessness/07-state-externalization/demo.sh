@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-COMPOSE=(podman compose -f compose.yml)
+COMPOSE=(docker compose -f compose.yml)
 SVC=order-svc
 
 if (( CLEAN_ONLY )); then

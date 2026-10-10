@@ -72,7 +72,7 @@ def build_title(prs, total):
                 "\u2014  Docs 01\u201311",
                 size=F.BODY_SMALL, color=C.TEXT_MUTED, italic=True, font=FontFam.BODY)
     bp.add_text(slide, Inches(1.0), Inches(5.9), Inches(11.3), Inches(0.4),
-                "Every pattern has a runnable Podman demo  \u2014  02\u201311 host-verified",
+                "Every pattern has a runnable Docker demo  \u2014  02\u201311 host-verified",
                 size=F.BODY_SMALL, color=C.ACCENT_CYAN, font=FontFam.BODY)
     bp.add_text(slide, Inches(1.0), Inches(6.5), Inches(11.3), Inches(0.4),
                 REPO_URL, size=F.CAPTION, color=C.TEXT_MUTED, font=FontFam.CODE)
@@ -89,7 +89,7 @@ def build_title(prs, total):
         "request memory, explicit process-scoped ownership, externalized "
         "authoritative state, health checks and graceful shutdown — compose "
         "into one realistic gRPC service by the end.\n\n"
-        "Every pattern here has a runnable Podman demo, and examples 2 "
+        "Every pattern here has a runnable Docker demo, and examples 2 "
         "through 11 are host-verified end to end on Fedora 44. We'll cue each "
         "demo at the point its pattern is introduced.")
 
@@ -209,13 +209,15 @@ def main():
     prs.save(str(OUT_PATH))
     print(f"\nSaved: {OUT_PATH}")
     print(f"Slide count: {page - 1}")
-    NOTES_PATH.write_text(
-        f"# Build notes — cpp-statelessness-compendium.pptx\n\n"
-        f"- Total slides: {page - 1}\n"
-        f"- Sections rendered: {len(SECTIONS)}\n"
-        f"- Generator: tools/build-statelessness-pptx.py\n"
-        f"- Content source: tools/sections_statelessness.py\n"
-        f"- Shared builders: tools/build-pptx.py (loaded via importlib)\n")
+    bp.write_statelessness_notes(NOTES_PATH, "compendium", [
+        "## cpp-statelessness-compendium.pptx (the 201 deck)",
+        "",
+        f"- Total slides: {page - 1}",
+        f"- Sections rendered: {len(SECTIONS)}",
+        "- Generator: tools/build-statelessness-pptx.py",
+        "- Content source: tools/sections_statelessness.py",
+        "- Shared builders: tools/build-pptx.py (loaded via importlib)",
+    ])
     print(f"Wrote: {NOTES_PATH}")
 
 

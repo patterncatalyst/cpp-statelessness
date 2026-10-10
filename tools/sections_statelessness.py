@@ -80,7 +80,7 @@ SECTIONS = [
                  C.ACCENT_BLUE),
                 ("0", "coordination needed to kill or restart a replica\nwhen nothing authoritative lives in-process",
                  C.ACCENT_GREEN),
-                ("02\u201311", "compendium examples, each a runnable Podman\ndemo, host-verified end to end on Fedora 44",
+                ("02\u201311", "compendium examples, each a runnable Docker\ndemo, host-verified end to end on Fedora 44",
                  C.ACCENT_CYAN),
                 ("1", "binary — stateless or stateful depending only on\nwhere it keeps state, not on its code",
                  C.ACCENT_PURPLE),
@@ -966,7 +966,7 @@ SECTIONS = [
                 heading("Ephemerality is the point, not a limitation", color=C.ACCENT_GREEN),
                 bullet("A crash + restart returns a known-clean filesystem state"),
                 bullet("No accreted local state to corrupt, fill the disk, or drift"),
-                bullet("rootless Podman's UID mapping: writes you DID allow land correctly"),
+                bullet("rootless Docker's UID mapping: writes you DID allow land correctly"),
                 bullet("Kubernetes ephemeral-storage budgets cap the tmpfs + writable layers"),
             ],
             "notes": (
@@ -974,7 +974,7 @@ SECTIONS = [
                 "it's a feature. Because nothing local accretes, a restart "
                 "always returns you to a known-clean state — no half-written "
                 "files, no disk slowly filling with logs, no drift between "
-                "replicas. Rootless Podman adds a UID-mapping wrinkle for the "
+                "replicas. Rootless Docker adds a UID-mapping wrinkle for the "
                 "writes you do allow, and Kubernetes lets you budget "
                 "ephemeral-storage so a runaway tmpfs can't take the node down."),
         },

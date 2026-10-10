@@ -11,7 +11,7 @@ is simply gone next start. The forcing function is to make the rootfs
 testing instead of vanishing silently in production.
 
 This example builds one small binary (`app`, using spdlog) and runs it
-under different `podman run` flags to show what that means for a C++
+under different `docker run` flags to show what that means for a C++
 service.
 
 ## What it demonstrates
@@ -47,7 +47,7 @@ restart.
 
 The build is a quick compile of one binary (spdlog + fmt via Conan).
 There is no long-running service and no ports — the demo runs the binary
-under several `podman run` configurations and shows the contrast.
+under several `docker run` configurations and shows the contrast.
 
 The host-level test:
 
@@ -55,17 +55,20 @@ The host-level test:
 ../../../scripts/test-stateless-demo-08-ephemeral-filesystem.sh
 ```
 
-## A note on `--read-only-tmpfs`
+## A note on tmpfs under `--read-only`
 
-Podman's `--read-only-tmpfs` (default **true**) auto-mounts a tmpfs on
-`/tmp`, `/run`, and `/var/tmp` when `--read-only` is set. The demo
-disables it (`--read-only-tmpfs=false`) in the scratch act to show the
-bare read-only behavior, then mounts a tmpfs explicitly. In production
-you either rely on that default or — better, because it is explicit and
-portable — mount the tmpfs yourself (compose `tmpfs:` / Kubernetes
-`emptyDir` with `medium: Memory`). Paths *not* covered by the auto-mount,
-like `/var/log` and `/var/cache`, are always read-only under
-`--read-only`, which is why the file-logger act fails reliably.
+Docker's `--read-only` does **not** auto-mount a tmpfs anywhere — `/tmp`,
+`/run`, `/var/tmp`, `/var/log`, `/var/cache` are all read-only with no
+exceptions. Scratch space always needs an explicit mount: `--tmpfs` on the
+CLI, `tmpfs:` in compose, or an `emptyDir` with `medium: Memory` in
+Kubernetes. The demo's Act 4 shows this directly — the bare `--read-only`
+`scratch` call fails, and only the explicit `--tmpfs /tmp` call succeeds.
+
+Podman differs here: its `--read-only-tmpfs` option (default **true**)
+auto-mounts a tmpfs on `/tmp`, `/run`, and `/var/tmp` whenever
+`--read-only` is set, so the equivalent bare command succeeds there. The
+portable habit either way is the same — mount scratch space explicitly
+rather than rely on a default that not every engine shares.
 
 ## How this relates to the other examples
 
@@ -84,5 +87,5 @@ container layer.
 ├── CMakeLists.txt     one binary, spdlog
 ├── conanfile.py       spdlog/1.14.1 (pulls fmt; both static)
 ├── Containerfile      UBI 10 builder; ubi-minimal runtime + libstdc++
-└── demo.sh            podman run under --read-only / --tmpfs
+└── demo.sh            docker run under --read-only / --tmpfs
 ```

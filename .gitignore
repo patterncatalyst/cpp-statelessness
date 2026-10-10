@@ -37,7 +37,6 @@ default.profraw
 *.exe
 *.gcda
 *.gcno
-Gemfile.lock
 graph_info.json
 .idea/
 install_manifest.txt

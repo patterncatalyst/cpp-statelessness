@@ -14,9 +14,11 @@
 #      worse as the pool oversubscribes, because hitting the quota
 #      mid-period throttles every thread until the next period boundary.
 #
-# Uses `podman run --cpus` directly (like demo-05) rather than compose,
-# because rootless CFS-quota enforcement needs the cgroup v2 `cpu`
-# controller delegated to your user slice — which the script detects.
+# Uses `docker run --cpus` directly (like demo-05) rather than compose.
+# A standard rootful Docker daemon enforces the CFS quota directly; only a
+# rootless engine (rootless Docker, or Podman's rootless default) needs the
+# cgroup v2 `cpu` controller delegated to your user slice first — which the
+# script detects.
 #
 # Usage:
 #   ./demo.sh           build + probe + pool-size sweep
@@ -34,33 +36,39 @@ ITERS=400000
 
 if [[ "${1:-}" == "--clean" ]]; then
     echo "==> Removing image $IMG"
-    podman rmi -f "$IMG" 2>/dev/null || true
+    docker rmi -f "$IMG" 2>/dev/null || true
     exit 0
 fi
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    sed -n '2,28p' "$0"; exit 0
+    sed -n '2,25p' "$0"; exit 0
 fi
 
 # ── cgroup v2 'cpu' controller delegation detection (G-40) ───────────
-# Rootless podman's --cpus needs the cpu controller delegated to the
-# user slice. Without it, --cpus is accepted but the CFS quota is not
-# enforced, so the throttling effect won't show. Detect and warn.
-HAS_CPU_DELEGATED=0
-DELEGATE_PATH="/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.subtree_control"
-if [[ -r "$DELEGATE_PATH" ]]; then
-    [[ "$(<"$DELEGATE_PATH")" == *cpu* ]] && HAS_CPU_DELEGATED=1
+# This only matters for a ROOTLESS engine (rootless Docker, or Podman's
+# rootless default): it needs the cgroup v2 'cpu' controller delegated to
+# the user slice before --cpus enforces a real CFS quota. A standard
+# rootful dockerd applies the quota directly as root and needs no
+# delegation, so skip the check unless Docker is actually running rootless.
+HAS_CPU_DELEGATED=1
+if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=rootless'; then
+    HAS_CPU_DELEGATED=0
+    DELEGATE_PATH="/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.subtree_control"
+    if [[ -r "$DELEGATE_PATH" ]]; then
+        [[ "$(<"$DELEGATE_PATH")" == *cpu* ]] && HAS_CPU_DELEGATED=1
+    fi
 fi
 if (( ! HAS_CPU_DELEGATED )); then
-    echo "WARNING: cgroup v2 'cpu' controller is not delegated to your user slice."
-    echo "  --cpus=$CPUS will be accepted but the CFS quota may not be enforced,"
-    echo "  so the throttling effect below may be muted (results will reflect the"
-    echo "  host's cores). To enable real enforcement:"
+    echo "WARNING: Docker is running rootless and the cgroup v2 'cpu' controller is"
+    echo "  not delegated to your user slice. --cpus=$CPUS will be accepted but the"
+    echo "  CFS quota may not be enforced, so the throttling effect below may be"
+    echo "  muted (results will reflect the host's cores). To enable real"
+    echo "  enforcement:"
     echo "    $REPO_ROOT/scripts/cgroup-delegation.sh enable   # then re-login"
     echo
 fi
 
 echo "==> Building $IMG (no gRPC/Conan — this is quick)"
-podman build -t "$IMG" -f Containerfile . >/dev/null
+docker build -t "$IMG" -f Containerfile . >/dev/null
 echo "    built"
 
 echo
@@ -68,7 +76,7 @@ echo "==> Act 1: cpu-probe inside --cpus=$CPUS"
 echo "    hardware_concurrency() reports the host; the cgroup quota is the"
 echo "    truth the pool should be sized from."
 echo "    ------------------------------------------------------------"
-podman run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/cpu-probe | sed 's/^/    /'
+docker run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/cpu-probe | sed 's/^/    /'
 echo "    ------------------------------------------------------------"
 
 echo
@@ -78,7 +86,7 @@ echo "    ------------------------------------------------------------"
 for p in 1 2 4 8; do
     label=""
     [[ "$p" == "$CPUS" ]] && label="   <- matches the --cpus=$CPUS quota"
-    out="$(podman run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/pool-bench "$p" "$TASKS" "$ITERS")"
+    out="$(docker run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/pool-bench "$p" "$TASKS" "$ITERS")"
     if [[ "$out" != pool=* ]]; then
         echo "    ERROR: pool-bench did not produce a result line (got:" >&2
         printf '%s\n' "$out" | head -3 | sed 's/^/      /' >&2

@@ -74,14 +74,16 @@ No Conan, no gRPC — two standard-library binaries that build in seconds.
 
 CI verification: `scripts/test-stateless-demo-05-threading.sh`.
 
-Rootless `--cpus` only enforces a real CFS quota if the cgroup v2 `cpu`
-controller is delegated to your user slice; the demo detects this and points
-you at `scripts/cgroup-delegation.sh enable` if it's missing.
+`--cpus` is enforced directly by a standard rootful Docker daemon — no
+delegation needed. It only depends on cgroup v2 `cpu`-controller delegation
+to your user slice if you're running a rootless engine (rootless Docker or
+Podman); the demo detects that case and points you at
+`scripts/cgroup-delegation.sh enable` if delegation is missing.
 
 ## What you'll see
 
 Representative output on a Fedora 44 host (22 logical cores) with
-GCC 14 and Podman 5.x, running the container under `--cpus=2`:
+GCC 14 and rootful Docker 29.x, running the container under `--cpus=2`:
 
 ```
 ==> cpu-probe   (inside --cpus=2)
@@ -110,8 +112,9 @@ GCC 14 and Podman 5.x, running the container under `--cpus=2`:
   a task can be throttled for a full period when the cgroup runs out of quota
   mid-window. The mean barely moved; the tail fell off a cliff.
 - **If the tails *don't* climb past pool=2**, your `--cpus` isn't being
-  enforced — see the delegation caveat below. Muted throttling means the
-  cgroup `cpu` controller isn't delegated to your rootless user slice.
+  enforced — see the delegation caveat below. On rootful Docker this would be
+  unusual; on a rootless engine it means the cgroup `cpu` controller isn't
+  delegated to your user slice.
 
 ## Files
 
@@ -124,15 +127,17 @@ GCC 14 and Podman 5.x, running the container under `--cpus=2`:
 - `CMakeLists.txt` — two binaries; no external dependencies
 - `Containerfile` — UBI 10 (base gcc/gcc-c++ + cmake) → `ubi-minimal`; no
   Conan, no gRPC
-- `demo.sh` — the driver (`podman run --cpus`)
+- `demo.sh` — the driver (`docker run --cpus`)
 
 ## Caveats and gotchas
 
-- **Rootless `--cpus` needs cgroup delegation to bite.** `--cpus` only
-  enforces a real CFS quota rootless if the cgroup v2 `cpu` controller is
-  delegated to your user slice. Without it, the flag is accepted but not
-  enforced and the throttling effect is muted — the tails won't climb. Enable
-  it with `scripts/cgroup-delegation.sh enable`, then re-login.
+- **`--cpus` needs cgroup delegation only on a rootless engine.** A standard
+  rootful Docker daemon enforces a real CFS quota directly. Running rootless
+  (rootless Docker, or Podman's rootless default) needs the cgroup v2 `cpu`
+  controller delegated to your user slice first; without it, the flag is
+  accepted but not enforced and the throttling effect is muted — the tails
+  won't climb. Enable it with `scripts/cgroup-delegation.sh enable`, then
+  re-login.
 - **The throttle window is the CFS period (~100 ms).** The max-latency
   number tracks the default `cpu.cfs_period_us`. Shortening the period
   reduces individual stalls but raises scheduling overhead; it's rarely the

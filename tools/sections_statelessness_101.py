@@ -509,7 +509,7 @@ SECTIONS = [
                 "externalization composed into one real service.\n\n"
                 "Read the documents in order if you want the full arc; each "
                 "one stands alone if you already know roughly where you need "
-                "depth. Every pattern in the compendium has a runnable Podman "
+                "depth. Every pattern in the compendium has a runnable Docker "
                 "demo, host-verified end to end — this on-ramp doesn't carry "
                 "its own demos, the compendium's do."),
         },

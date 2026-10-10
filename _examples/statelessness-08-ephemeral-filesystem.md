@@ -22,7 +22,7 @@ explicitly-mounted volume disappears on restart, and the kernel does not
 warn you. The forcing function is a **read-only rootfs**, so accidental
 writes fail loudly with `EROFS` in testing instead of vanishing silently in
 production. This example builds one small spdlog binary and runs it under
-different `podman run` flags to show what that means in C++.
+different `docker run` flags to show what that means in C++.
 
 ## Why this matters
 
@@ -74,13 +74,13 @@ cd examples/statelessness/08-ephemeral-filesystem
 
 The build is a quick compile of one binary (spdlog + fmt via Conan). There
 is no long-running service and no ports — the demo runs the binary under
-several `podman run` configurations and shows the contrast.
+several `docker run` configurations and shows the contrast.
 
 CI verification: `scripts/test-stateless-demo-08-ephemeral-filesystem.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Podman 5.x — the file logger
+Representative output on a Fedora 44 host with Docker 29.x — the file logger
 crashing on a read-only rootfs, the stdout fix working, ephemerality across
 a restart, and scratch needing an explicit tmpfs:
 
@@ -135,11 +135,12 @@ a restart, and scratch needing an explicit tmpfs:
   at logger construction, before your service does any work — which is why
   it crashes at startup rather than at first log line. Prefer the stdout
   sink in a container, always.
-- **`--read-only-tmpfs` defaults to true and hides the trap.** Podman
-  auto-mounts a tmpfs on `/tmp`, `/run`, and `/var/tmp` under `--read-only`.
-  The demo disables it (`--read-only-tmpfs=false`) in the scratch act to show
-  the bare behaviour. Paths *not* covered — `/var/log`, `/var/cache` — are
-  always read-only, which is why the file-logger act fails reliably.
+- **Docker's `--read-only` never auto-mounts a tmpfs anywhere.** Unlike
+  Podman — whose `--read-only-tmpfs` default auto-mounts `/tmp`, `/run`, and
+  `/var/tmp` under `--read-only` — Docker leaves every path read-only with no
+  exceptions, so scratch space always needs an explicit `--tmpfs`. Act 4 shows
+  this directly: the bare `--read-only` run fails, and only the explicit
+  `--tmpfs /tmp` run succeeds.
 - **Mount scratch tmpfs explicitly in production.** Relying on the auto-mount
   is fragile; an explicit compose `tmpfs:` / Kubernetes `emptyDir` with
   `medium: Memory` is portable and visible. And size it — a tmpfs counts

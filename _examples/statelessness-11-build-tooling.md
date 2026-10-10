@@ -74,7 +74,7 @@ reporting the full host count — the gap a container-aware service closes.
 
 ```bash
 cd examples/statelessness/11-build-tooling
-podman compose -f compose.yml build   # build + run the gtest gate
+docker compose -f compose.yml build   # build + run the gtest gate
 ./demo.sh                              # tests + the cap sweep
 ./demo.sh --clean                      # remove the image
 ```
@@ -85,7 +85,7 @@ GoogleTest is the only Conan dependency, and it's test-only.
 ## What you'll see
 
 Actual output from a host run on Fedora 44 (GCC 14, 22 logical cores,
-Podman 5.x) — the gtest gate, then the same binary under three cap settings:
+rootful Docker 29.x) — the gtest gate, then the same binary under three cap settings:
 
 ```
 ==> Act 1: unit tests (gtest over the pure parsers, in-container)
@@ -98,11 +98,11 @@ Podman 5.x) — the gtest gate, then the same binary under three cap settings:
     hardware_concurrency(): 22
     memory_limit_bytes()  : unbounded
 
-==> Act 3: podman run --cpus=1.5
+==> Act 3: docker run --cpus=1.5
     cpu_limit_cores()     : 1.5 cores       <- read from cpu.max "150000 100000"
     hardware_concurrency(): 22              (still the host count)
 
-==> Act 4: podman run --cpus=0.5 --memory=256m
+==> Act 4: docker run --cpus=0.5 --memory=256m
     cpu_limit_cores()     : 0.5 cores
     hardware_concurrency(): 22              (the gap a naive pool would oversubscribe)
     memory_limit_bytes()  : 268435456 bytes (256.0 MiB)
@@ -122,10 +122,11 @@ Podman 5.x) — the gtest gate, then the same binary under three cap settings:
 - **`memory_limit_bytes()` reads the exact cap.** `268435456` is precisely
   256 MiB — the helper read `memory.max` directly, so a cache sized from it
   respects the cgroup rather than the host's RAM.
-- **`in_container()` reading `false` is expected under rootless podman.** See
-  the caveat below — it's a known limitation of cgroup-path sniffing, not a
-  defect, and it does *not* affect the limit readers, which are the
-  critical path.
+- **`in_container()` tracks the engine's cgroup path, not the caps.** See
+  the caveat below — under a rootful Docker install the `/docker/` marker is
+  usually present and it reads `true`; under rootless engines (rootless
+  Docker, or Podman's rootless default) it often reads `false`. Either way it
+  does *not* affect the limit readers, which are the critical path.
 
 ## Files
 
@@ -142,9 +143,12 @@ Podman 5.x) — the gtest gate, then the same binary under three cap settings:
 
 ## Caveats and gotchas
 
-- **`in_container()` reads `false` under rootless podman — and that's not a
-  bug.** A rootless container's `/proc/1/cgroup` often reads `0::/` with none
-  of the docker/libpod/`.scope` markers the heuristic sniffs for, so the
+- **`in_container()`'s true/false split tracks rootful vs. rootless, not
+  which engine you used — and that's not a bug.** Under a standard rootful
+  Docker install, `/proc/1/cgroup` contains a `/docker/` (or `.scope`) marker
+  the heuristic matches, so it reads `true`. Under a rootless engine (rootless
+  Docker, or Podman's rootless default), `/proc/1/cgroup` often reads `0::/`
+  with none of the `docker`/`libpod`/`.scope` markers present, so the
   detection underreports. It does **not** affect the limit readers:
   `cpu_limit_cores()` and `memory_limit_bytes()` read `cpu.max` / `memory.max`
   directly and track the caps exactly (as the sweep shows). Treat

@@ -2,11 +2,11 @@
 #
 # One service that builds the image and runs helper-demo unconstrained.
 # The interesting part is sweeping the SAME image under different cgroup
-# caps, which `./demo.sh` does with `podman run --cpus/--memory` — compose
+# caps, which `./demo.sh` does with `docker run --cpus/--memory` — compose
 # fixes a service's limits, so the cap sweep lives in the demo script.
 #
-# Build:      podman compose -f compose.yml build
-# Default run: podman compose -f compose.yml up
+# Build:      docker compose -f compose.yml build
+# Default run: docker compose -f compose.yml up
 # Full demo:  ./demo.sh   (build + tests + cap sweep)
 
 services:

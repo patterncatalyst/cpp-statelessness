@@ -25,7 +25,7 @@ The treatment is opinionated and reference-style. Where positions are taken, the
 
 ## Audience
 
-The intended reader is a seasoned C++ developer or architect who knows the language well — RAII, move semantics, templates, the standard library — and is now building or operating services that deploy to Podman or Kubernetes. Familiarity with gRPC, OpenTelemetry, and a Grafana-stack (Loki, Tempo, Mimir) observability environment is assumed; the toolchain references are GCC/Clang, Conan, CMake, Ninja, with C++20 as the portable baseline and C++23 features called out where they meaningfully help.
+The intended reader is a seasoned C++ developer or architect who knows the language well — RAII, move semantics, templates, the standard library — and is now building or operating services that deploy to Docker or Kubernetes. Familiarity with gRPC, OpenTelemetry, and a Grafana-stack (Loki, Tempo, Mimir) observability environment is assumed; the toolchain references are GCC/Clang, Conan, CMake, Ninja, with C++20 as the portable baseline and C++23 features called out where they meaningfully help.
 
 Developers coming from monolith-heavy C++ backgrounds will recognize a recurring theme: instincts that served well in long-running daemons on dedicated hardware — Meyers singletons, file-based logging, static caches, "the process lives forever" — break in subtle ways under containerization. Each document calls out where the instinct misleads and what to use instead.
 
@@ -53,11 +53,11 @@ For specific problems, the scenario guide below jumps to the relevant document.
 
 **[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) — State externalization patterns in C++.** What goes outside the process: authoritative session state, counters, durable workflow, queues, business data. Connection pools as process-scoped infrastructure with per-handler RAII checkout. The `ScopedConnection` pattern with `invalidate()` for broken-connection handling. Idempotency keys, deadlines propagating to backing services, retry-with-backoff vs fail-fast. The cache-fix for [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }})'s counterexample. The Outbox pattern for atomic DB-write-plus-event-emission.
 
-**[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) — The ephemeral filesystem trap.** The container filesystem is ephemeral. The overlayfs layer model, `read_only: true` as the forcing function, what goes where (rootfs read-only, `/tmp` tmpfs, persistent volumes for what survives), logs to stdout, the C++ library traps (spdlog file defaults, crash dumps, ML model caches, coverage data, prometheus_cpp textfiles), Kubernetes ephemeral-storage budgets, rootless Podman's UID-mapping story, restart semantics as a feature.
+**[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) — The ephemeral filesystem trap.** The container filesystem is ephemeral. The overlayfs layer model, `read_only: true` as the forcing function, what goes where (rootfs read-only, `/tmp` tmpfs, persistent volumes for what survives), logs to stdout, the C++ library traps (spdlog file defaults, crash dumps, ML model caches, coverage data, prometheus_cpp textfiles), Kubernetes ephemeral-storage budgets, rootless Docker's UID-mapping story (userns-remap), restart semantics as a feature.
 
 **[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) — Health checks as the public API of statelessness.** The orchestrator's API into the service. The three probes (startup, liveness, readiness) and what each means. The gRPC standard health protocol with the `HealthCheckServiceInterface` C++ API. Separate-port vs same-port trade-offs. The graceful-shutdown sequence that ties together `std::stop_token` ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), pool draining ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})), and reverse-order destruction ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})). Health-check anti-patterns.
 
-**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) — Microservices with gRPC and C++.** The end-to-end integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `podman-compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
+**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) — Microservices with gRPC and C++.** The end-to-end integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
 
 **[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) — Build tooling appendix.** Conan 2.x setup with version-pinned dependencies, dev and release profiles (AddressSanitizer in dev, LTO + hardening in release), CMake structure with proto codegen, the C++23 feature support table (GCC 14+ for `<stacktrace>` and `std::pmr::stacktrace`, GCC 15+ for `std::flat_map`), standard-library choice (libstdc++ vs libc++), multi-stage Containerfile pattern, full source for the vendored helpers (`cgroup_helper`, `psi_reader`, `otel_propagator`), test infrastructure, common gotchas.
 
@@ -98,7 +98,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 1. **Orchestrator state ≠ language state.** Statelessness is decided by deployment configuration (volumes, StatefulSet status, no persistent mounts), not by what the C++ code does internally. The same binary can be deployed both ways.
 
-2. **Podman primary, Kubernetes noted where it differs.** This stack favors Podman for development and Kubernetes for production; the documents lead with Podman/compose syntax and add Kubernetes notes where the semantics or syntax materially differ.
+2. **Docker primary, Kubernetes noted where it differs.** This stack favors Docker for development and Kubernetes for production; the documents lead with Docker/compose syntax and add Kubernetes notes where the semantics or syntax materially differ.
 
 3. **Request-scope vs process-scope is the practical seam.** Every piece of operational state slots into one or the other, and RAII enforces the seam cleanly.
 
@@ -110,7 +110,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 7. **OS container requests and limits shape C++ behaviour in non-obvious ways.** CPU limits via CFS quotas, memory limits as OOM ceiling, ephemeral-storage as log-volume budget — all affect how process-scoped state must be sized.
 
-8. **"Container" is overloaded vocabulary.** `std::vector` is a container; an OCI/Podman/Docker container is a container; a Kubernetes container is a container inside a pod. Where ambiguity is possible, the documents say "std container" / "OS container" / "Kubernetes container" explicitly.
+8. **"Container" is overloaded vocabulary.** `std::vector` is a container; an OCI/Docker/Podman container is a container; a Kubernetes container is a container inside a pod. Where ambiguity is possible, the documents say "std container" / "OS container" / "Kubernetes container" explicitly.
 
 9. **C++ pays a "globals tax" that 12-factor languages don't.** Static initialization, the SIOF, Meyers singleton synchronization, global ctor pile-up — all affect cold-start latency that orchestrators measure.
 
@@ -128,7 +128,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 **External state.** State that lives outside any process — Redis, PostgreSQL, Kafka, S3. Lifetime decoupled from any one container; authoritative for cross-replica consistency. [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
 
-**OS container.** An OCI-compatible container instance — Podman, Docker, containerd. Has a process tree, a filesystem (with an ephemeral overlayfs writable layer), a network namespace, cgroup-enforced resource limits. The "container" in cloud-native parlance.
+**OS container.** An OCI-compatible container instance — Docker, Podman, containerd. Has a process tree, a filesystem (with an ephemeral overlayfs writable layer), a network namespace, cgroup-enforced resource limits. The "container" in cloud-native parlance.
 
 **Kubernetes container.** A container inside a pod. Has the OS container's properties plus pod-level networking, volume mounts, and probe configuration. Multiple containers per pod is unusual for application code but common for sidecars (Envoy, otel-collector).
 
@@ -201,7 +201,7 @@ Online references used across the set:
 - gRPC C++ documentation and best practices (`grpc.io/docs/languages/cpp/`)
 - OpenTelemetry C++ SDK documentation (`opentelemetry.io/docs/instrumentation/cpp/`)
 - Kubernetes documentation on probes, resource management, downward API (`kubernetes.io/docs/`)
-- Podman documentation, especially `--read-only`, `--tmpfs`, rootless mode
+- Docker documentation, especially `--read-only`, `--tmpfs`, rootless mode (Podman differs in some rootless defaults; see Doc 08)
 - Linux kernel documentation on cgroups v2, CFS, PSI (`kernel.org/doc/`)
 - cppreference (`en.cppreference.com`) for C++ standard library specifics
 - Conan 2 documentation (`docs.conan.io`) and CMake documentation

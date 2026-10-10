@@ -7,9 +7,9 @@
 #   :50051  gRPC — Echo + readiness via the standard health service
 #   :8080   HTTP — liveness (/healthz)
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
-# Tear down:  ./demo.sh --clean   (or: podman compose -f compose.yml down)
+# Tear down:  ./demo.sh --clean   (or: docker compose -f compose.yml down)
 
 services:
   health-svc:

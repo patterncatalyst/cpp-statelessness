@@ -31,15 +31,15 @@ The middle definition is the practical one. It permits an in-process cache as lo
 
 A useful test: if a replica is killed and re-spawned with no warning, do clients notice anything other than (at worst) a small latency spike on the first few requests? If yes, the service is not stateless in this sense — regardless of what its developers say.
 
-A note on vocabulary before going further: "container" is overloaded. In this compendium, *std container* refers to `std::vector` and friends, *OS container* refers to an OCI-format unit run by Podman or Docker, and *Kubernetes container* refers to a container inside a Kubernetes pod. Where the meaning is obvious from context, the bare word is fine; where it could go either way, the docs are explicit.
+A note on vocabulary before going further: "container" is overloaded. In this compendium, *std container* refers to `std::vector` and friends, *OS container* refers to an OCI-format unit run by Docker or Podman, and *Kubernetes container* refers to a container inside a Kubernetes pod. Where the meaning is obvious from context, the bare word is fine; where it could go either way, the docs are explicit.
 
-## The orchestrator's line: posture in Podman and Kubernetes
+## The orchestrator's line: posture in Docker and Kubernetes
 
-The project's primary container stack is Podman with podman-compose. Kubernetes is noted where it materially differs. The architectural point — same binary, different posture — applies in both.
+The project's primary container stack is Docker with Docker Compose. Kubernetes is noted where it materially differs. The architectural point — same binary, different posture — applies in both.
 
-### Podman / podman-compose
+### Docker / Docker Compose
 
-Podman expresses posture implicitly through a handful of options on `podman run` or in `compose.yaml`. A service is stateless to the extent that none of these conditions hold:
+Docker expresses posture implicitly through a handful of options on `docker run` or in `compose.yaml`. A service is stateless to the extent that none of these conditions hold:
 
 A named volume is mounted that the service writes to (the volume survives container restart by design).
 
@@ -49,9 +49,9 @@ The container has a fixed `container_name` rather than being scaled.
 
 Recreate-on-update behaviour is configured to preserve identity.
 
-If none of those apply — the rootfs is `read_only: true`, any writable paths are `tmpfs:` mounts, and the service is scaled via replicas — the deployment is effectively stateless, and any number of replicas can be spun up or down without coordination. Podman doesn't formalize "stateless vs stateful" as separate object types; the posture is the sum of these implicit choices.
+If none of those apply — the rootfs is `read_only: true`, any writable paths are `tmpfs:` mounts, and the service is scaled via replicas — the deployment is effectively stateless, and any number of replicas can be spun up or down without coordination. Docker doesn't formalize "stateless vs stateful" as separate object types; the posture is the sum of these implicit choices.
 
-There is no Podman analogue to a Kubernetes `StatefulSet`. Podman pods (the OCI/k8s pod concept, supported via `podman pod`) group containers by network namespace but don't add ordinal identity or per-pod persistent volumes. Workloads that need ordinal identity tend to outgrow podman-compose for production and end up on Kubernetes, where `podman generate kube` is the convenient bridge.
+There is no Docker (or Podman) analogue to a Kubernetes `StatefulSet`. Podman has a pod abstraction (`podman pod`, borrowed from Kubernetes) that groups containers by network namespace; Docker has no built-in equivalent beyond a shared Compose network. Workloads that need ordinal identity tend to outgrow Docker Compose for production and end up on Kubernetes — `kompose` (a third-party CLI) converts a compose file into a starting-point Kubernetes manifest; Podman users get the same bridge natively via `podman generate kube`.
 
 ### Kubernetes (where it differs)
 
@@ -61,7 +61,7 @@ A `Deployment` manages a `ReplicaSet`, which in turn manages a pool of pods. Pod
 
 A `StatefulSet`, by contrast, gives each pod a stable, ordinal identity. Pod names are `<name>-0`, `<name>-1`, `<name>-2`. Each pod gets its own persistent volume claim bound by ordinal: `data-<name>-0` always attaches to pod `<name>-0` even after rescheduling. DNS records are stable; `<name>-0.<service>.<namespace>.svc.cluster.local` resolves to whichever pod currently holds that ordinal. Pods are created in order (`-0` first, then `-1`, then `-2`) and deleted in reverse order. This is intended for workloads where pods are not interchangeable: primary/replica databases, quorum-based systems like etcd or ZooKeeper, sharded services with affinity to ordinal-bound data.
 
-The crucial observation, in either runtime, is that *this distinction is purely orchestrator-side*. The C++ binary in both cases is the same `main()`, the same gRPC service, the same handlers. What changes is the manifest. The binary may inspect its own pod or container name to learn its ordinal — set via Podman's `--hostname` or Kubernetes' downward API into an environment variable — and behave differently accordingly, but that adaptation is environment-driven, not baked in.
+The crucial observation, in either runtime, is that *this distinction is purely orchestrator-side*. The C++ binary in both cases is the same `main()`, the same gRPC service, the same handlers. What changes is the manifest. The binary may inspect its own pod or container name to learn its ordinal — set via Docker's `--hostname` or Kubernetes' downward API into an environment variable — and behave differently accordingly, but that adaptation is environment-driven, not baked in.
 
 ## Same binary, three manifests
 
@@ -115,7 +115,7 @@ private:
 int main() {
     // INSTANCE_ID is whatever the orchestrator chose to call us — pod name
     // under Kubernetes (via downward API), container name or hostname under
-    // Podman. Falls back to a sentinel for bare local runs.
+    // Docker. Falls back to a sentinel for bare local runs.
     const auto instance_id = env_or("INSTANCE_ID", "local-unknown");
     const auto listen      = env_or("LISTEN_ADDR", "0.0.0.0:50051");
 
@@ -134,10 +134,10 @@ int main() {
 
 The handler is a pure function of its input. There is no per-client state, no in-process cache, no shared mutable data. The only process-local datum is `instance_id_`, which is informational, not behavioral — it is included in the response so callers can verify load distribution.
 
-Three manifests follow. The first is `compose.yaml` for podman-compose — the primary stack for local development and single-host deployment:
+Three manifests follow. The first is `compose.yaml` for Docker Compose — the primary stack for local development and single-host deployment:
 
 ```yaml
-# compose.yaml — podman-compose, stateless posture
+# compose.yaml — Docker Compose, stateless posture
 services:
   compute:
     image: registry.example.com/compute:1.0.0
@@ -218,7 +218,7 @@ spec:
           emptyDir: { medium: Memory }
 ```
 
-The Kubernetes manifest expresses the same three things — read-only rootfs, RAM-backed `/tmp`, CPU/memory budget — using its own vocabulary. `readOnlyRootFilesystem` mirrors Podman's `read_only: true`. `emptyDir: { medium: Memory }` is the analogue of Podman's `tmpfs:`. `resources.requests`/`limits` is the more granular cousin of compose's `deploy.resources`. Probes are richer than Podman's single-check model — startup, liveness, and readiness are separate, and gRPC-native probes (since Kubernetes 1.24) avoid needing `grpc_health_probe` as an exec.
+The Kubernetes manifest expresses the same three things — read-only rootfs, RAM-backed `/tmp`, CPU/memory budget — using its own vocabulary. `readOnlyRootFilesystem` mirrors Docker's `read_only: true`. `emptyDir: { medium: Memory }` is the analogue of Docker's `tmpfs:`. `resources.requests`/`limits` is the more granular cousin of compose's `deploy.resources`. Probes are richer than Docker's single-check model — startup, liveness, and readiness are separate, and gRPC-native probes (since Kubernetes 1.24) avoid needing `grpc_health_probe` as an exec.
 
 A `StatefulSet`, for the case where the instance ordinal is meaningful — for example, a sharded computation where input keys hash to ordinals:
 
@@ -258,9 +258,9 @@ spec:
             grpc: { port: 50051 }
 ```
 
-The binary is identical across all three manifests. The deployment posture differs entirely in the orchestration. Under podman-compose with `replicas: 4`, `INSTANCE_ID` comes from the hostname Podman assigns and is hash-suffixed. Under a Kubernetes `Deployment`, it comes from `metadata.name` and is also hash-suffixed. Under a `StatefulSet`, it ends with a stable ordinal (`compute-0`, `compute-1`, …) that the binary could parse and use for sharding. Whether that adaptation lives in code is a design decision; the point here is that the C++ side is parameterized over what role this instance plays, not hard-coded to one or the other.
+The binary is identical across all three manifests. The deployment posture differs entirely in the orchestration. Under Docker Compose with `replicas: 4`, `INSTANCE_ID` comes from the hostname Docker assigns and is hash-suffixed. Under a Kubernetes `Deployment`, it comes from `metadata.name` and is also hash-suffixed. Under a `StatefulSet`, it ends with a stable ordinal (`compute-0`, `compute-1`, …) that the binary could parse and use for sharding. Whether that adaptation lives in code is a design decision; the point here is that the C++ side is parameterized over what role this instance plays, not hard-coded to one or the other.
 
-> **Opinion.** A well-designed C++ service should default to deployment-agnostic: write code that does the right thing under podman-compose or a Kubernetes `Deployment`, and bring in `StatefulSet`-specific logic only when there is a concrete reason — sharding, leader election, persistent local state that must survive restart. Defaulting to a `StatefulSet` posture "to be safe" is a common anti-pattern. It costs you horizontal scaling agility and introduces ordering constraints you have not asked for.
+> **Opinion.** A well-designed C++ service should default to deployment-agnostic: write code that does the right thing under Docker Compose or a Kubernetes `Deployment`, and bring in `StatefulSet`-specific logic only when there is a concrete reason — sharding, leader election, persistent local state that must survive restart. Defaulting to a `StatefulSet` posture "to be safe" is a common anti-pattern. It costs you horizontal scaling agility and introduces ordering constraints you have not asked for.
 
 ## A counterexample worth recognizing
 
@@ -342,7 +342,7 @@ The fourth is that the singleton stores data. Singletons that hold pure configur
 
 The fifth is that the file is the log. In a monolith, you write logs to `/var/log/myservice/myservice.log` and a logrotate cron handles rotation. In a container, you write to `stdout` and the orchestrator collects, ships, and rotates. The 12-factor "logs as event streams" principle ([Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}), [Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})) is operationally enforced by the platform — fighting it leads to losing log data on restart.
 
-The sixth is that the thread pool sizes itself to the box. On dedicated hardware, `std::thread::hardware_concurrency()` returned a number that matched what the OS would actually schedule. Under a container with CPU limits — `--cpus=0.5` in Podman, `resources.limits.cpu: "500m"` in Kubernetes — `hardware_concurrency()` still returns the host's CPU count, not the cgroup quota. A pool sized to the host count oversubscribes the actual budget, and the kernel's CFS throttling shows up as tail-latency spikes that are hard to attribute. The same gotcha applies to gRPC's default thread pool, to jemalloc/tcmalloc arena counts, and to any library that probes the CPU count at construction. The fix is to size pools explicitly from a `CPU_LIMIT` environment variable set by the orchestrator. Relatedly, `thread_local` storage was effectively request-local in many monolith server models (thread-per-request); in a thread-pool model under either runtime, `thread_local` is process-scoped and persists across requests that happen to share a thread. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers both gotchas in detail.
+The sixth is that the thread pool sizes itself to the box. On dedicated hardware, `std::thread::hardware_concurrency()` returned a number that matched what the OS would actually schedule. Under a container with CPU limits — `--cpus=0.5` in Docker, `resources.limits.cpu: "500m"` in Kubernetes — `hardware_concurrency()` still returns the host's CPU count, not the cgroup quota. A pool sized to the host count oversubscribes the actual budget, and the kernel's CFS throttling shows up as tail-latency spikes that are hard to attribute. The same gotcha applies to gRPC's default thread pool, to jemalloc/tcmalloc arena counts, and to any library that probes the CPU count at construction. The fix is to size pools explicitly from a `CPU_LIMIT` environment variable set by the orchestrator. Relatedly, `thread_local` storage was effectively request-local in many monolith server models (thread-per-request); in a thread-pool model under either runtime, `thread_local` is process-scoped and persists across requests that happen to share a thread. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers both gotchas in detail.
 
 Each of these intuitions is correct in its original context. The point is not that the developer was wrong, but that the constraints have changed.
 
@@ -356,13 +356,13 @@ A *sharded cache* service runs N replicas where each owns a key range, by consis
 
 A *primary-replica database* (Postgres with streaming replication, MySQL with binlog replication, Redis with sentinel) is unambiguously stateful and lives in a `StatefulSet`.
 
-For a typical microservice in the user's stack — gRPC service, OTel-instrumented, observed via Grafana — the default posture is stateless: podman-compose with `read_only: true` and named replicas, or a Kubernetes `Deployment`. `StatefulSet` is reached for only when there is a concrete reason. The rest of this compendium assumes the stateless default unless otherwise noted.
+For a typical microservice in the user's stack — gRPC service, OTel-instrumented, observed via Grafana — the default posture is stateless: Docker Compose with `read_only: true` and named replicas, or a Kubernetes `Deployment`. `StatefulSet` is reached for only when there is a concrete reason. The rest of this compendium assumes the stateless default unless otherwise noted.
 
 ## Recommendation summary
 
 A few practical guidelines that the rest of the doc set builds on.
 
-Default to deployment-agnostic code that runs correctly under podman-compose or a Kubernetes `Deployment`. Treat `StatefulSet` as something to opt into for a specific reason.
+Default to deployment-agnostic code that runs correctly under Docker Compose or a Kubernetes `Deployment`. Treat `StatefulSet` as something to opt into for a specific reason.
 
 Use the three-scope vocabulary — request, process, deploy-time — when reasoning about where any given piece of state should live. The right scope for a datum is the one with the shortest lifetime that still allows correct operation.
 
@@ -370,7 +370,7 @@ Treat in-process caches as performance optimizations that miss to an authoritati
 
 Treat the OS container as ephemeral. The reasonable upper bound on its lifetime is hours. Design accordingly — fast startup, fast graceful shutdown, no on-disk state that you would miss.
 
-Use the orchestrator's primitives — environment variables, Podman `--hostname` or the Kubernetes downward API, env files or ConfigMaps/Secrets, healthchecks or probes — as the C++ binary's interface to its environment. Subsequent docs cover each in detail.
+Use the orchestrator's primitives — environment variables, Docker `--hostname` or the Kubernetes downward API, env files or ConfigMaps/Secrets, healthchecks or probes — as the C++ binary's interface to its environment. Subsequent docs cover each in detail.
 
 Size process-scoped state — connection pools, in-process caches, prepared-statement caches, the PMR upstream resource — as an explicit fraction of the OS container's memory limit. An unbounded `std::unordered_map` reached for by reflex is a future OOM. [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) develops this.
 
@@ -394,9 +394,9 @@ Treat threading infrastructure — pools, executors, fiber schedulers — as pro
 
 [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) covers externalization of state to Redis, PostgreSQL, and similar backing services, including the cache-fix for the counterexample above.
 
-[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers the ephemeral filesystem and why disk writes are different in containers, including Podman `read_only` and Kubernetes `readOnlyRootFilesystem`.
+[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers the ephemeral filesystem and why disk writes are different in containers, including Docker `read_only` and Kubernetes `readOnlyRootFilesystem`.
 
-[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) covers health checks — Podman `HEALTHCHECK` and Kubernetes probes — which are the orchestrator's view of whether your service is doing its job.
+[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) covers health checks — Docker `HEALTHCHECK` and Kubernetes probes — which are the orchestrator's view of whether your service is doing its job.
 
 [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) is the integrating gRPC C++ document where the patterns from all prior docs land in a single working service.
 

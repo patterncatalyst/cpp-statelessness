@@ -73,6 +73,6 @@ RUN microdnf install -y --setopt=install_weak_deps=0 \
 COPY --from=builder /src/build/app /usr/local/bin/app
 
 # One binary, several modes selected by the command. CMD (not ENTRYPOINT)
-# so a passed command REPLACES the default (G-66): `podman run IMG app
+# so a passed command REPLACES the default (G-66): `docker run IMG app
 # log-file /var/log/x` runs that mode; a bare run logs to stdout.
 CMD ["/usr/local/bin/app", "log-stdout"]

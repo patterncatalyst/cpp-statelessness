@@ -6,16 +6,16 @@
 #                           flips to SERVING; liveness is up the whole time.
 #   2. Liveness vs ready   — SIGUSR1 drives readiness NOT_SERVING while
 #                           liveness stays 200; SIGUSR1 again restores it.
-#   3. Graceful shutdown   — SIGTERM (podman stop) drains in order and the
+#   3. Graceful shutdown   — SIGTERM (docker stop) drains in order and the
 #                           process exits 0; the logs show the sequence.
 #
-# We query readiness with the in-image health-probe via `podman exec`, and
+# We query readiness with the in-image health-probe via `docker exec`, and
 # liveness with curl against the published HTTP port. No host gRPC tooling
 # needed.
 
 set -euo pipefail
 
-COMPOSE="podman compose -f compose.yml"
+COMPOSE="docker compose -f compose.yml"
 CTR="stateless-09hc-svc"
 SVC="demo.health.EchoService"
 LIVENESS_URL="http://127.0.0.1:18080/healthz"
@@ -31,7 +31,7 @@ cleanup() { [[ $KEEP -eq 1 ]] || { echo; echo "==> Tearing down (use --keep to l
 trap cleanup EXIT
 
 # probe readiness from inside the container; prints SERVING/NOT_SERVING line
-ready() { podman exec "$CTR" /usr/local/bin/health-probe localhost:50051 "$SVC" 2>/dev/null || true; }
+ready() { docker exec "$CTR" /usr/local/bin/health-probe localhost:50051 "$SVC" 2>/dev/null || true; }
 live()  { curl -fsS --max-time 2 "$LIVENESS_URL" >/dev/null 2>&1 && echo "200 ok" || echo "DOWN"; }
 
 echo "==> Building and starting health-svc"
@@ -62,7 +62,7 @@ echo "    Send SIGUSR1: the service flips READINESS to NOT_SERVING (traffic woul
 echo "    stop) but LIVENESS stays green (no restart). This is the distinction that"
 echo "    keeps a temporarily-busy or draining replica from being killed."
 echo
-podman kill -s SIGUSR1 "$CTR" >/dev/null
+docker kill -s SIGUSR1 "$CTR" >/dev/null
 sleep 1
 echo "    after SIGUSR1:"
 echo "      liveness  /healthz : $(live)        <- still alive, would NOT be restarted"
@@ -70,26 +70,26 @@ echo "      readiness $SVC : $(ready | sed 's/^health-probe[^:]*: //')   <- remo
 echo
 echo "    Send SIGUSR1 again to recover readiness (no restart needed — the"
 echo "    12-factor corollary: not-ready should return to ready without a restart)."
-podman kill -s SIGUSR1 "$CTR" >/dev/null
+docker kill -s SIGUSR1 "$CTR" >/dev/null
 sleep 1
 echo "      readiness $SVC : $(ready | sed 's/^health-probe[^:]*: //')      <- ready again"
 
 # ── Act 3: graceful shutdown ──────────────────────────────────────────
 echo
-echo "==> Act 3: graceful shutdown (SIGTERM via 'podman stop')"
+echo "==> Act 3: graceful shutdown (SIGTERM via 'docker stop')"
 echo "    Watch the ordered drain: readiness NOT_SERVING first (stop new traffic),"
 echo "    then the background worker stops, then gRPC drains in-flight RPCs, then"
 echo "    a clean exit 0."
 echo
-podman stop -t 30 "$CTR" >/dev/null 2>&1 &
+docker stop -t 30 "$CTR" >/dev/null 2>&1 &
 STOP_PID=$!
 # Stream the shutdown log lines as they appear.
 sleep 1
-podman logs "$CTR" 2>&1 | grep -E "SIGTERM|readiness NOT_SERVING|worker drained|Shutdown|Wait\(\) returned" \
+docker logs "$CTR" 2>&1 | grep -E "SIGTERM|readiness NOT_SERVING|worker drained|Shutdown|Wait\(\) returned" \
     | sed 's/^/      /' || true
 wait $STOP_PID 2>/dev/null || true
 echo
 echo "    Exit code of the container process:"
-echo "      $(podman inspect "$CTR" --format '{{.State.ExitCode}}' 2>/dev/null || echo '0') (0 = clean graceful stop)"
+echo "      $(docker inspect "$CTR" --format '{{.State.ExitCode}}' 2>/dev/null || echo '0') (0 = clean graceful stop)"
 echo
 echo "Done. Re-run with --keep to leave it up, or --clean to tear down."

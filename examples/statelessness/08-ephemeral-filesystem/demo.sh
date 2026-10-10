@@ -2,7 +2,7 @@
 # statelessness/08-ephemeral-filesystem — read-only rootfs demo.
 #
 # Builds a tiny image (one binary, spdlog) and runs it under different
-# `podman run` flags to show four things:
+# `docker run` flags to show four things:
 #
 #   1. The trap. `app log-file /var/log/app.log` under `--read-only`:
 #      spdlog's basic_logger_mt opens the file in its constructor and the
@@ -18,7 +18,7 @@
 #   4. Scratch needs a tmpfs. `app scratch /tmp` under `--read-only`
 #      fails; the same under `--read-only --tmpfs /tmp` succeeds.
 #
-# Uses `podman run` directly (like demo-05) rather than compose, because
+# Uses `docker run` directly (like demo-05) rather than compose, because
 # the lesson is about per-container runtime flags.
 #
 # Usage:
@@ -33,7 +33,7 @@ IMG=cpp-tut/stateless-08-ephemeral-filesystem:latest
 
 if [[ "${1:-}" == "--clean" ]]; then
     echo "==> Removing image $IMG"
-    podman rmi -f "$IMG" 2>/dev/null || true
+    docker rmi -f "$IMG" 2>/dev/null || true
     exit 0
 fi
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -41,14 +41,14 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 echo "==> Building $IMG"
-podman build -t "$IMG" -f Containerfile . >/dev/null
+docker build -t "$IMG" -f Containerfile . >/dev/null
 echo "    built"
 
-run() { podman run --rm "$@"; }
+run() { docker run --rm "$@"; }
 
 echo
 echo "==> Act 1: the trap — a file logger under a read-only rootfs"
-echo "    \$ podman run --read-only IMG app log-file /var/log/app.log"
+echo "    \$ docker run --read-only IMG app log-file /var/log/app.log"
 if run --read-only "$IMG" app log-file /var/log/app.log; then
     echo "    (unexpected: the write succeeded)"
 else
@@ -57,15 +57,15 @@ fi
 
 echo
 echo "==> Act 2: the fix — log to stdout under the same read-only rootfs"
-echo "    \$ podman run --read-only IMG app log-stdout"
+echo "    \$ docker run --read-only IMG app log-stdout"
 run --read-only "$IMG" app log-stdout | sed 's/^/    /'
 echo "    => stdout is captured by the runtime; nothing is written to disk."
 
 echo
 echo "==> Act 3: ephemerality — a writable-rootfs write does not survive a restart"
-echo "    \$ podman run IMG app log-file /var/log/app.log     (writable rootfs)"
+echo "    \$ docker run IMG app log-file /var/log/app.log     (writable rootfs)"
 run "$IMG" app log-file /var/log/app.log 2>&1 | sed 's/^/    /' || true
-echo "    \$ podman run IMG app check-file /var/log/app.log   (fresh container)"
+echo "    \$ docker run IMG app check-file /var/log/app.log   (fresh container)"
 if run "$IMG" app check-file /var/log/app.log | sed 's/^/    /'; then
     echo "    (unexpected: the file persisted)"
 else
@@ -74,13 +74,16 @@ fi
 
 echo
 echo "==> Act 4: scratch needs an explicitly-mounted tmpfs"
-echo "    \$ podman run --read-only --read-only-tmpfs=false IMG app scratch /tmp"
-if run --read-only --read-only-tmpfs=false "$IMG" app scratch /tmp; then
-    echo "    (note: /tmp was writable — your podman auto-mounted a tmpfs)"
+echo "    \$ docker run --read-only IMG app scratch /tmp"
+if run --read-only "$IMG" app scratch /tmp; then
+    echo "    (unexpected: /tmp was writable without an explicit tmpfs)"
 else
     echo "    => failed: /tmp is on the read-only rootfs with no tmpfs mounted."
+    echo "       (Podman differs here: its --read-only-tmpfs default auto-mounts"
+    echo "        a tmpfs on /tmp, so the same bare command succeeds there. Docker"
+    echo "        never does this implicitly -- scratch space is always explicit.)"
 fi
-echo "    \$ podman run --read-only --tmpfs /tmp:rw,size=16m IMG app scratch /tmp"
+echo "    \$ docker run --read-only --tmpfs /tmp:rw,size=16m IMG app scratch /tmp"
 run --read-only --tmpfs /tmp:rw,size=16m "$IMG" app scratch /tmp | sed 's/^/    /'
 echo "    => succeeded: scratch belongs on a tmpfs, sized and recycled by the runtime."
 

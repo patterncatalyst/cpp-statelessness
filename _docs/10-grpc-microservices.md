@@ -1,6 +1,6 @@
 ---
 title: Microservices with gRPC and C++ (end-to-end example)
-description: "The end-to-end integration. A realistic order-pricing service skeleton: proto, Config, RequestContext, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete main() with twelve cross-referenced steps, full podman-compose.yaml, full Kubernetes manifest. Every prior pattern in one place."
+description: "The end-to-end integration. A realistic order-pricing service skeleton: proto, Config, RequestContext, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete main() with twelve cross-referenced steps, full compose.yaml, full Kubernetes manifest. Every prior pattern in one place."
 order: 10
 layout: tutorial
 sectionid: docs
@@ -13,7 +13,7 @@ part: integration-tooling
 
 This is the integration document. The prior nine established patterns in isolation: RAII for request scope ([Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }})), PMR arenas for per-request allocation ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), process-scoped state owned in `main()` ([Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }})), threading model ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), 12-factor adaptation ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})), state externalization ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})), ephemeral filesystem ([Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), health checks and shutdown ([Doc 09 (health checks)]({{ '/docs/09-health-checks/' | relative_url }})). This document shows them composed in a realistic gRPC service — a small but plausible "order pricing" service that exercises every prior pattern in a single end-to-end implementation.
 
-The shape: a service proto, a `Config` struct, a `RequestContext` type, a process-scoped wiring in `main()`, a handler that touches PostgreSQL, Redis, and an upstream gRPC service, the health-check and graceful-shutdown sequence, and a deployment wrapper in both `podman-compose.yaml` and Kubernetes manifest form. The code is C++20-portable; C++23 features called out where they meaningfully help. The implementations are sketches — production code adds more error handling and instrumentation — but they're complete enough that the composition is visible.
+The shape: a service proto, a `Config` struct, a `RequestContext` type, a process-scoped wiring in `main()`, a handler that touches PostgreSQL, Redis, and an upstream gRPC service, the health-check and graceful-shutdown sequence, and a deployment wrapper in both `compose.yaml` and Kubernetes manifest form. The code is C++20-portable; C++23 features called out where they meaningfully help. The implementations are sketches — production code adds more error handling and instrumentation — but they're complete enough that the composition is visible.
 
 This document is heavier on code than the others by design. The point is to make the integration concrete, not to develop new ideas. Each block points back to the document that develops its pattern in detail.
 
@@ -518,7 +518,7 @@ void install_signal_handler(grpc::Server* server,
 
 ## Compose deployment
 
-The `podman-compose.yaml` wrapper, with read-only rootfs ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), resource limits ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})), and the gRPC health check ([Doc 09]({{ '/docs/09-health-checks/' | relative_url }})):
+The `compose.yaml` wrapper, with read-only rootfs ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), resource limits ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})), and the gRPC health check ([Doc 09]({{ '/docs/09-health-checks/' | relative_url }})):
 
 ```yaml
 services:

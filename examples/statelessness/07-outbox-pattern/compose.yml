@@ -14,7 +14,7 @@
 # services, and EXTERNAL (localhost:19092) so host tools like kcat can
 # read the topic. See README for the kcat prerequisite.
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
 # Tear down:  ./demo.sh --clean
 

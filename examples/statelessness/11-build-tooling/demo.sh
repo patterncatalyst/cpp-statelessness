@@ -21,19 +21,19 @@
 set -euo pipefail
 
 IMAGE="cpp-tut/stateless-11-build-tooling:latest"
-COMPOSE="podman compose -f compose.yml"
+COMPOSE="docker compose -f compose.yml"
 
 if [[ "${1:-}" == "--clean" ]]; then
     $COMPOSE down --remove-orphans 2>/dev/null || true
-    podman rmi "$IMAGE" 2>/dev/null || true
+    docker rmi "$IMAGE" 2>/dev/null || true
     exit 0
 fi
 
 echo "==> Building the image (compiles GoogleTest + runs the gtest gate)"
 $COMPOSE build
 
-run() { podman run --rm "$@" "$IMAGE"; }            # cap flags BEFORE image (default CMD = helper-demo)
-run_cmd() { podman run --rm "$IMAGE" "$@"; }          # command AFTER image
+run() { docker run --rm "$@" "$IMAGE"; }            # cap flags BEFORE image (default CMD = helper-demo)
+run_cmd() { docker run --rm "$IMAGE" "$@"; }          # command AFTER image
 
 # ── Act 1: unit tests ─────────────────────────────────────────────────
 echo
@@ -53,15 +53,15 @@ run 2>&1 | sed 's/^/    /'
 
 # ── Act 3: --cpus=1.5 ─────────────────────────────────────────────────
 echo
-echo "==> Act 3: podman run --cpus=1.5"
-echo "    podman writes '150000 100000' to the container's cgroup cpu.max;"
+echo "==> Act 3: docker run --cpus=1.5"
+echo "    docker writes '150000 100000' to the container's cgroup cpu.max;"
 echo "    cpu_limit_cores() reads it back as 1.5 cores."
 echo
 run --cpus=1.5 2>&1 | sed 's/^/    /'
 
 # ── Act 4: --cpus=0.5 --memory=256m ───────────────────────────────────
 echo
-echo "==> Act 4: podman run --cpus=0.5 --memory=256m"
+echo "==> Act 4: docker run --cpus=0.5 --memory=256m"
 echo "    Both caps detected. Note hardware_concurrency() still reports the"
 echo "    full host count — the Doc 05 trap a cgroup-aware pool avoids."
 echo

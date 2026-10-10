@@ -15,29 +15,34 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/_helpers.sh"
 
-require podman
+require docker
 
 DEMO="$REPO_ROOT/examples/statelessness/05-threading"
 IMG=cpp-tut/stateless-05-threading:latest
 CPUS=2
 cd "$DEMO"
 
-cleanup() { log_step "removing image"; podman rmi -f "$IMG" 2>/dev/null || true; }
+cleanup() { log_step "removing image"; docker rmi -f "$IMG" 2>/dev/null || true; }
 trap cleanup EXIT
 
-# delegation detection
-HAS_CPU_DELEGATED=0
-DELEGATE_PATH="/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.subtree_control"
-if [[ -r "$DELEGATE_PATH" && "$(<"$DELEGATE_PATH")" == *cpu* ]]; then
-    HAS_CPU_DELEGATED=1
+# delegation detection — only matters on a rootless engine (rootless Docker,
+# or Podman's rootless default); a standard rootful dockerd enforces --cpus
+# directly and needs no delegation.
+HAS_CPU_DELEGATED=1
+if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=rootless'; then
+    HAS_CPU_DELEGATED=0
+    DELEGATE_PATH="/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.subtree_control"
+    if [[ -r "$DELEGATE_PATH" && "$(<"$DELEGATE_PATH")" == *cpu* ]]; then
+        HAS_CPU_DELEGATED=1
+    fi
 fi
 
 log_step "Phase 1 — build image"
-podman build -t "$IMG" -f Containerfile . >/dev/null
+docker build -t "$IMG" -f Containerfile . >/dev/null
 log_ok "image built"
 
 log_step "Phase 2 — cpu-probe under --cpus=$CPUS"
-probe="$(podman run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/cpu-probe)"
+probe="$(docker run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/cpu-probe)"
 printf '%s\n' "$probe" | sed 's/^/    /'
 if printf '%s\n' "$probe" | grep -q 'recommended thread-pool size'; then
     log_ok "cpu-probe reported a recommended pool size"
@@ -47,7 +52,7 @@ fi
 
 log_step "Phase 3 — pool-bench sweep under --cpus=$CPUS"
 get_tp() {  # $1 = pool size → echoes integer throughput
-    podman run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/pool-bench "$1" 2000 400000 \
+    docker run --rm --cpus="$CPUS" "$IMG" /usr/local/bin/pool-bench "$1" 2000 400000 \
         | grep -oE 'throughput=[0-9]+' | head -1 | cut -d= -f2
 }
 tp2="$(get_tp 2)"

@@ -81,12 +81,12 @@ cd examples/statelessness/09-health-checks
 
 The first build compiles the gRPC chain (~5 min cold); a warm Conan cache is
 far faster. The demo queries readiness with the in-image `health-probe` via
-`podman exec`, and liveness with `curl` against the published HTTP port — no
+`docker exec`, and liveness with `curl` against the published HTTP port — no
 host gRPC tooling needed.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Podman 5.x — staged startup,
+Representative output on a Fedora 44 host with Docker 29.x — staged startup,
 the liveness/readiness split, a SIGUSR1 readiness toggle, then graceful
 shutdown:
 
@@ -97,13 +97,13 @@ shutdown:
     t+3.1s  readiness grpc.health Check  -> SERVING       (init complete)
     -> liveness was green throughout; readiness gated traffic until ready
 
-==> act 2: readiness toggle   (podman kill -s SIGUSR1)
+==> act 2: readiness toggle   (docker kill -s SIGUSR1)
     readiness Check -> NOT_SERVING   (drained from rotation)
     liveness  /healthz -> 200 ok      (still alive — NOT restarted)
     [SIGUSR1 again]
     readiness Check -> SERVING        (returned to ready on its own)
 
-==> act 3: graceful shutdown   (podman stop -> SIGTERM)
+==> act 3: graceful shutdown   (docker stop -> SIGTERM)
     [sig] SIGTERM received (flag set)
     [ctl] readiness -> NOT_SERVING  (stop new traffic)
     [ctl] request_stop() background worker

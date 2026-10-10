@@ -100,8 +100,8 @@ CI verification: `scripts/test-stateless-demo-02-raii.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with GCC 14 and Podman
-5.x — the three modes driven in sequence, with the acquire/release balance
+Representative output on a Fedora 44 host with GCC 14 and Docker
+29.x — the three modes driven in sequence, with the acquire/release balance
 summarised at the end:
 
 ```

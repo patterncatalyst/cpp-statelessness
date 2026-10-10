@@ -94,8 +94,8 @@ CI verification: `scripts/test-stateless-demo-04-process-scoped-state.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with GCC 14 and Podman
-5.x — the build order at startup, an eviction under a capacity of 4, then
+Representative output on a Fedora 44 host with GCC 14 and Docker
+29.x — the build order at startup, an eviction under a capacity of 4, then
 the reverse-order teardown on stop:
 
 ```

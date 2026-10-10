@@ -156,7 +156,7 @@ Note that `MyService` receives `ChannelCache&` and `sw::redis::Redis&` as constr
 
 ## OS container resource limits — the budget
 
-Process-scoped state has to fit inside an OS container's resource budget. The budget is set by the runtime: Podman `--memory` and `--cpus` flags, compose `deploy.resources.limits`, or Kubernetes `resources.limits`/`resources.requests` per container. Several C++-relevant points.
+Process-scoped state has to fit inside an OS container's resource budget. The budget is set by the runtime: Docker `--memory` and `--cpus` flags, compose `deploy.resources.limits`, or Kubernetes `resources.limits`/`resources.requests` per container. Several C++-relevant points.
 
 **Memory limits are hard.** Hit the limit and the OOM killer terminates the process — no graceful failure, no exception to catch, just SIGKILL. The kernel's view of the limit is precise; the C++ allocator's view is approximate. By the time `std::bad_alloc` would have been thrown, the kernel has often already killed the process. Mitigations are about sizing process-scoped state conservatively, leaving explicit headroom for transient request-scoped allocations, and treating the limit as an architectural constraint, not a runtime check.
 
@@ -166,9 +166,9 @@ Process-scoped state has to fit inside an OS container's resource budget. The bu
 
 **Ephemeral-storage limits cap log volume.** Kubernetes `resources.limits.ephemeral-storage` caps the writable layer plus `emptyDir` plus container logs. A C++ service that writes verbose logs to stdout can blow this budget under unexpected load. Mitigations are structured log levels, rate-sampling noisy events, and aggressive shipping to Loki so logs don't accumulate locally. [Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers the ephemeral-storage angle in detail.
 
-**Podman vs Kubernetes syntax.** Same semantics, different spellings.
+**Docker vs Kubernetes syntax.** Same semantics, different spellings.
 
-| | Podman CLI | compose.yaml | Kubernetes |
+| | Docker CLI | compose.yaml | Kubernetes |
 |---|---|---|---|
 | Memory limit | `--memory=256m` | `deploy.resources.limits.memory: 256M` | `resources.limits.memory: 256Mi` |
 | CPU limit | `--cpus=0.5` | `deploy.resources.limits.cpus: "0.5"` | `resources.limits.cpu: "500m"` |
@@ -176,7 +176,7 @@ Process-scoped state has to fit inside an OS container's resource budget. The bu
 | CPU reservation | (none direct) | `deploy.resources.reservations.cpus` | `resources.requests.cpu` |
 | Ephemeral storage | (no enforcement) | (no enforcement) | `resources.limits.ephemeral-storage` |
 
-The "burstable" pattern — set requests but not limits — is widely used for latency-sensitive Kubernetes workloads. Podman has no direct equivalent; it's a single-host orchestration model where the limit is the only knob. For services that need to handle bursts without throttling, leaving CPU limits unset in Kubernetes is often the right answer.
+The "burstable" pattern — set requests but not limits — is widely used for latency-sensitive Kubernetes workloads. Docker has no direct equivalent; it's a single-host orchestration model where the limit is the only knob. For services that need to handle bursts without throttling, leaving CPU limits unset in Kubernetes is often the right answer.
 
 ## Sizing process-scoped state against the limit
 
@@ -289,7 +289,7 @@ Bound every growing structure. Caches get explicit byte budgets and eviction pol
 
 Prefer `std::flat_map` for small N, `std::unordered_map` for larger N, third-party density-optimized maps for cache hot paths, and dedicated LRU libraries for byte-budgeted caches.
 
-Use Podman's `--memory` and `--cpus` flags, or compose `deploy.resources` blocks, during development. Kubernetes `resources.requests`/`resources.limits` are the production-side analogue; same semantics, different syntax.
+Use Docker's `--memory` and `--cpus` flags, or compose `deploy.resources` blocks, during development. Kubernetes `resources.requests`/`resources.limits` are the production-side analogue; same semantics, different syntax.
 
 ## Cross-references
 
@@ -324,4 +324,4 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Kubernetes documentation, "Resource Management for Pods and Containers" (`kubernetes.io/docs/concepts/configuration/manage-resources-containers/`).** The canonical reference for the `requests`/`limits` model. Worth reading once for the QoS-class semantics (BestEffort, Burstable, Guaranteed).
 
-**Podman documentation on `--memory`, `--cpus`, and the compose `deploy.resources` block.** The single-host counterpart to the Kubernetes resource model.
+**Docker documentation on `--memory`, `--cpus`, and the compose `deploy.resources` block.** The single-host counterpart to the Kubernetes resource model.

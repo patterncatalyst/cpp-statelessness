@@ -56,9 +56,12 @@ phenomenon in miniature.
 
 CI verification: `../../../scripts/test-stateless-demo-05-threading.sh`.
 
-### Rootless CFS-quota enforcement
+### CFS-quota enforcement on a rootless engine
 
-`--cpus` only enforces a real CFS quota rootless if the cgroup v2 `cpu`
+A standard rootful Docker daemon enforces `--cpus` as a real CFS quota
+directly — no extra setup needed. It only depends on cgroup delegation if
+you're running a rootless engine (rootless Docker, or Podman's rootless
+default): `--cpus` only enforces a real quota there if the cgroup v2 `cpu`
 controller is delegated to your user slice. The demo detects this and
 warns if it's missing; without it, `--cpus` is accepted but not
 enforced, so the throttling effect is muted. Enable delegation with the
@@ -68,8 +71,8 @@ repo helper, then re-login:
 ../../../scripts/cgroup-delegation.sh enable
 ```
 
-Delegate the controller once per host and every rootless Podman demo that
-enforces CPU limits benefits from it.
+Delegate the controller once per host and every rootless demo (Docker or
+Podman) that enforces CPU limits benefits from it.
 
 ## Layout
 
@@ -80,7 +83,7 @@ enforces CPU limits benefits from it.
 ├── src/pool_bench.cpp   CPU-bound workload across a sized pool; latency percentiles
 ├── CMakeLists.txt       two binaries; no external deps
 ├── Containerfile        UBI 10 (gcc + cmake) → ubi-minimal; no Conan/gRPC
-└── demo.sh              the driver (podman run --cpus)
+└── demo.sh              the driver (docker run --cpus)
 ```
 
 ## Beyond your own pools

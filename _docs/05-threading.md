@@ -184,7 +184,7 @@ For a C++ service, the practical answer is async I/O via coroutines on top of an
 
 This is the section the project brief asked us to cover directly. [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covered CPU limits from the memory-budget angle (throttling raises queue depth, queue depth multiplies request-scoped memory). Doc 05 covers them from the threading angle, which is where most of the day-to-day pain lives.
 
-The Linux CFS scheduler enforces CPU limits via a quota/period mechanism. A container with `--cpus=2` (Podman) or `resources.limits.cpu: "2"` (Kubernetes) is given a quota of 200 ms per 100 ms period — it can consume 200 ms of aggregate CPU time before being throttled until the next period boundary. Thread parallelism does not multiply the budget: eight threads each running 25 ms in a 100 ms period have already consumed the 200 ms quota, and the kernel suspends all of them until the next period boundary. The unlucky thread that was about to be scheduled when the quota was reached can wait up to roughly 75 ms.
+The Linux CFS scheduler enforces CPU limits via a quota/period mechanism. A container with `--cpus=2` (Docker) or `resources.limits.cpu: "2"` (Kubernetes) is given a quota of 200 ms per 100 ms period — it can consume 200 ms of aggregate CPU time before being throttled until the next period boundary. Thread parallelism does not multiply the budget: eight threads each running 25 ms in a 100 ms period have already consumed the 200 ms quota, and the kernel suspends all of them until the next period boundary. The unlucky thread that was about to be scheduled when the quota was reached can wait up to roughly 75 ms.
 
 Three consequences for C++ service design follow directly.
 
@@ -202,17 +202,17 @@ When a container hits its CPU quota mid-period, the kernel throttles all of the 
 
 Mitigations come in three flavours.
 
-The most reliable is to oversize the CPU limit relative to mean utilization — run at 60-70% mean utilization, leaving headroom for bursts. This is straightforward in a development environment with podman-compose; in production Kubernetes, it costs cluster capacity and trades latency for cost.
+The most reliable is to oversize the CPU limit relative to mean utilization — run at 60-70% mean utilization, leaving headroom for bursts. This is straightforward in a development environment with Docker Compose; in production Kubernetes, it costs cluster capacity and trades latency for cost.
 
 Under Kubernetes, the burstable QoS class — set `resources.requests` but not `resources.limits.cpu` — lets the pod burst above its request when the node has capacity. The trade-off is unbounded blast radius if the service goes runaway. For user-facing latency-sensitive services, this is usually worth it; for batch workloads or services with poorly understood worst-case behaviour, it isn't.
 
-Reducing the CFS period (`cpu.cfs_period_us` set to 10 ms instead of the default 100 ms) shrinks worst-case throttling pauses at the cost of more scheduler overhead. This is less commonly available in managed Kubernetes environments but useful in self-managed clusters or in bare-Podman deployments where you control the host.
+Reducing the CFS period (`cpu.cfs_period_us` set to 10 ms instead of the default 100 ms) shrinks worst-case throttling pauses at the cost of more scheduler overhead. This is less commonly available in managed Kubernetes environments but useful in self-managed clusters or in bare-Docker deployments where you control the host.
 
 The default advice remains "more headroom." Running close to the limit is usually the actual problem; tuning kernel parameters is a finer instrument.
 
 ## Memory limits and thread stack budget
 
-Each `std::thread` defaults to a stack of 1 MB on glibc, up to 8 MB on some platforms. The stack is reserved as virtual memory but pages are only committed as used, so the impact on resident set size is smaller than the address-space reservation suggests. Even so, under tight memory limits — `--memory=256M` on Podman, `resources.limits.memory: "256Mi"` on Kubernetes — a 100-thread pool can commit hundreds of MB of address space, which interacts badly with everything else competing for memory: gRPC's send/receive buffers, connection pools, the PMR upstream resource, in-process caches.
+Each `std::thread` defaults to a stack of 1 MB on glibc, up to 8 MB on some platforms. The stack is reserved as virtual memory but pages are only committed as used, so the impact on resident set size is smaller than the address-space reservation suggests. Even so, under tight memory limits — `--memory=256M` on Docker, `resources.limits.memory: "256Mi"` on Kubernetes — a 100-thread pool can commit hundreds of MB of address space, which interacts badly with everything else competing for memory: gRPC's send/receive buffers, connection pools, the PMR upstream resource, in-process caches.
 
 Three mitigations apply. The first is smaller per-thread stacks via `pthread_attr_setstacksize` for application pools where the call depth is known and bounded. 128 KB is often plenty for handler code that doesn't recurse deeply. The second is fewer threads — async I/O via C++20 coroutines reduces the thread count dramatically; one thread per CPU core plus a few I/O threads can replace dozens of blocking threads. The third is fibers (Boost.Fiber) with smaller default stacks (64-256 KB) as a middle ground for codebases not yet ready for full coroutines.
 

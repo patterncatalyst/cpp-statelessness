@@ -6,9 +6,9 @@
 # observability demos under examples/demo-04 wire the LGTM stack;
 # the compendium's later examples reuse it where it earns its place.)
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
-# Tear down:  ./demo.sh --clean   (or: podman compose -f compose.yml down -v)
+# Tear down:  ./demo.sh --clean   (or: docker compose -f compose.yml down -v)
 
 services:
   raii-svc:

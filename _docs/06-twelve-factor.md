@@ -33,9 +33,9 @@ Eight of the twelve factors map cleanly to C++ practice and warrant short treatm
 
 **Factor VII (Port binding).** Services bind to a port and serve. gRPC C++ binds via `ServerBuilder::AddListeningPort`; the port number comes from config. Trivially aligned.
 
-**Factor X (Dev/prod parity).** Keep development, staging, and production as similar as possible. Podman locally and Kubernetes in production give acceptable parity for most cases. `podman generate kube` produces a Kubernetes manifest from a compose file when literal parity is needed.
+**Factor X (Dev/prod parity).** Keep development, staging, and production as similar as possible. Docker locally and Kubernetes in production give acceptable parity for most cases. (Podman's `podman generate kube` produces a Kubernetes manifest from a compose file for literal parity; Docker has no built-in equivalent, but `kompose` does the same job.)
 
-**Factor XI (Logs).** Treat logs as event streams. Write structured JSON to stdout; let the orchestrator (Podman's logging driver, Kubernetes' container runtime, then Loki) collect and route. Do not write log files inside the container. [Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers this from the ephemeral-filesystem angle.
+**Factor XI (Logs).** Treat logs as event streams. Write structured JSON to stdout; let the orchestrator (Docker's logging driver, Kubernetes' container runtime, then Loki) collect and route. Do not write log files inside the container. [Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers this from the ephemeral-filesystem angle.
 
 **Factor XII (Admin processes).** Run admin and management tasks as one-off processes. In C++ services, this typically means a separate binary (or the same binary with a different command-line subcommand) for database migrations, cache priming, scheduled jobs. Same image, different entry point.
 
@@ -233,7 +233,7 @@ For Processes, use dependency injection: construct process-scoped objects in `ma
 
 For Disposability, audit static constructors and eliminate the ones that don't need to be global. Minimize shared library count where feasible. Defer expensive initialization until after the health endpoint is serving NOT_SERVING. Treat fast startup as a deploy-velocity question, not a micro-optimization.
 
-For the other nine factors, follow the 12-factor canon directly. Conan for dependencies, structured logs to stdout, services as one-off binaries or subcommands, Podman locally and Kubernetes in production for parity.
+For the other nine factors, follow the 12-factor canon directly. Conan for dependencies, structured logs to stdout, services as one-off binaries or subcommands, Docker locally and Kubernetes in production for parity.
 
 ## Cross-references
 
@@ -268,6 +268,6 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Kubernetes documentation, "Configure Liveness, Readiness and Startup Probes".** The canonical reference for the probe model that the Disposability factor leans on. The interaction between startup probes and C++ cold-start time is documented there, though not in C++-specific terms.
 
-**Podman documentation on `HEALTHCHECK` directives and compose `healthcheck` blocks.** The single-host equivalent to the Kubernetes probe model. Same semantics, different syntax.
+**Docker documentation on `HEALTHCHECK` directives and compose `healthcheck` blocks.** The single-host equivalent to the Kubernetes probe model. Same semantics, different syntax.
 
 **"C++ High Performance" (2nd edition).** The chapter on application startup and initialization is relevant background for the cold-start discussion. The book's treatment of compilation models and link-time optimization is useful for the compile-time-config dimension.

@@ -11,9 +11,9 @@ part: operational
 
 ## Thesis
 
-The health-check endpoint is the orchestrator's API into the service. It is the mechanism by which Podman or Kubernetes decides whether to route traffic to a replica, whether to restart a sick one, and whether a newly-started one has finished initializing. The rest of the doc set has been about getting the internals of statelessness right — RAII, PMR, process-scoped state, threading, externalization, ephemeral filesystem. The health check is where those internals meet the orchestrator. Get it wrong and the architectural work doesn't matter: a service that's correctly designed but reports wrong health gets killed during deploys, takes traffic before it can serve, or fails to be removed from rotation when it goes bad.
+The health-check endpoint is the orchestrator's API into the service. It is the mechanism by which Docker or Kubernetes decides whether to route traffic to a replica, whether to restart a sick one, and whether a newly-started one has finished initializing. The rest of the doc set has been about getting the internals of statelessness right — RAII, PMR, process-scoped state, threading, externalization, ephemeral filesystem. The health check is where those internals meet the orchestrator. Get it wrong and the architectural work doesn't matter: a service that's correctly designed but reports wrong health gets killed during deploys, takes traffic before it can serve, or fails to be removed from rotation when it goes bad.
 
-The health-check semantics are more subtle than "is the service up." There are at least three distinct questions an orchestrator wants to ask — should I kill this replica, should I route traffic to it, has it finished starting up — and conflating them produces failure modes that look correct in development and fail in production. Kubernetes exposes the three as separate probes (startup, liveness, readiness); Podman's `HEALTHCHECK` directive collapses them into one. Either way, the C++ service has to think about each distinctly and answer them correctly.
+The health-check semantics are more subtle than "is the service up." There are at least three distinct questions an orchestrator wants to ask — should I kill this replica, should I route traffic to it, has it finished starting up — and conflating them produces failure modes that look correct in development and fail in production. Kubernetes exposes the three as separate probes (startup, liveness, readiness); Docker's `HEALTHCHECK` directive collapses them into one. Either way, the C++ service has to think about each distinctly and answer them correctly.
 
 This document covers the health-check model: the three probes and what each means, the gRPC standard health protocol that's become the canonical answer, the same-port-vs-separate-port trade-off, what "alive" and "ready" actually mean for a C++ service, and the graceful-shutdown sequence that ties [Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})'s `std::stop_token`, [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})'s pool draining, and [Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})'s destruction order into a single coherent flow.
 
@@ -41,7 +41,7 @@ This document covers the health-check model: the three probes and what each mean
 
 ## The three probes
 
-Kubernetes distinguishes three probes per container. Podman has a single `healthcheck`. The semantic distinctions are worth understanding even when only one of them is configurable, because they translate to the questions any orchestrator needs answered.
+Kubernetes distinguishes three probes per container. Docker has a single `healthcheck`. The semantic distinctions are worth understanding even when only one of them is configurable, because they translate to the questions any orchestrator needs answered.
 
 The **startup probe** asks "has the service finished initializing yet?" Until it succeeds, the other probes are not run. This is the probe that gives a C++ service time to construct its `TracerProvider`, build its channel cache, warm its connection pools, and load any deserialized configuration — all the process-scoped state from [Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }}). A slow-starting service that doesn't declare a startup probe risks being killed by liveness failures during its initialization. The probe is intended to be permissive: long timeout, many retries, no harm in being slow during the startup window.
 
@@ -51,7 +51,7 @@ The **readiness probe** asks "should I send traffic to this replica?" If it fail
 
 The composition matters: until the startup probe succeeds, the others are not consulted. Once startup succeeds, liveness and readiness run on their own schedules. Liveness failures lead to restarts; readiness failures lead to traffic removal. A correctly-designed health system has liveness rarely fail and readiness occasionally fail during deploys and transient issues.
 
-Podman's `HEALTHCHECK CMD ...` directive (set in the Dockerfile or in compose `healthcheck:` block) is a single check that drives container restart on failure. It maps most naturally to the liveness role; for combined liveness/readiness semantics under Podman, the service exposes a richer health endpoint and the check parameterizes which question it's asking.
+Docker's `HEALTHCHECK CMD ...` directive (set in the Containerfile or in compose `healthcheck:` block) is a single check that drives container restart on failure. It maps most naturally to the liveness role; for combined liveness/readiness semantics under Docker, the service exposes a richer health endpoint and the check parameterizes which question it's asking.
 
 ## What "alive" actually means
 
@@ -83,7 +83,7 @@ The 12-factor canon's "stateless processes" principle has an operational corolla
 
 ## The gRPC standard health protocol
 
-The canonical health-check answer for gRPC services is the standard `grpc.health.v1.Health` service. Defined in the gRPC project itself, supported by every language binding, surfaced as a `grpc_health_probe` command-line client that container orchestrators can invoke. Kubernetes 1.24+ supports a `grpc:` probe block natively; earlier versions and Podman use `grpc_health_probe` as an exec command.
+The canonical health-check answer for gRPC services is the standard `grpc.health.v1.Health` service. Defined in the gRPC project itself, supported by every language binding, surfaced as a `grpc_health_probe` command-line client that container orchestrators can invoke. Kubernetes 1.24+ supports a `grpc:` probe block natively; earlier versions and Docker/Podman use `grpc_health_probe` as an exec command.
 
 The protocol has two RPCs: `Check` returns the current serving status for a named service, and `Watch` streams status changes. The status is one of `UNKNOWN`, `SERVING`, `NOT_SERVING`, or `SERVICE_UNKNOWN`. Services maintain their status; clients query it.
 
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
 
 The `SetServingStatus` API is what the application uses to signal readiness. Per-service status (the second argument) supports fine-grained reporting; a service that depends on PostgreSQL can flip its own service name to NOT_SERVING while leaving the empty-name (server-wide) status as SERVING, allowing other services on the same server to keep serving traffic if PostgreSQL is the only failed dependency.
 
-The Podman `HEALTHCHECK` directive that calls `grpc_health_probe`:
+The Docker `HEALTHCHECK` directive that calls `grpc_health_probe`:
 
 ```dockerfile
 HEALTHCHECK --interval=5s --timeout=2s --start-period=30s --retries=3 \
@@ -189,7 +189,7 @@ startupProbe:
   # Total: up to 60 seconds for startup
 ```
 
-Podman's equivalent uses the `--start-period` option on the `HEALTHCHECK` directive — during the start period, failures are not counted against the retries budget.
+Docker's equivalent uses the `--start-period` option on the `HEALTHCHECK` directive — during the start period, failures are not counted against the retries budget.
 
 The application-side pattern uses the staged-startup approach from [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}): start the server with health reporting NOT_SERVING, do the expensive initialization, then flip health to SERVING when ready:
 
@@ -290,7 +290,7 @@ The sequence respects each subsystem's contract: gRPC drains in-flight RPCs to d
 
 Sizing `terminationGracePeriodSeconds` matters. The longest plausible in-flight RPC sets the lower bound; orchestrator policy (deploy speed, node drain time) sets the upper bound. 30 seconds is a reasonable default; latency-sensitive services with short RPCs can use less; services with long-running streaming RPCs need more.
 
-> **Opinion.** Every C++ service should have this shutdown sequence wired up before it ships, not added during the first production incident. The pattern is mechanical, fits in 50 lines, and prevents an entire category of deploy-time data loss. Test it locally with `podman stop` (which sends SIGTERM with a default 10-second grace) before deploying.
+> **Opinion.** Every C++ service should have this shutdown sequence wired up before it ships, not added during the first production incident. The pattern is mechanical, fits in 50 lines, and prevents an entire category of deploy-time data loss. Test it locally with `docker stop` (which sends SIGTERM with a default 10-second grace) before deploying.
 
 ## Health-check anti-patterns
 
@@ -316,7 +316,7 @@ Default to same-port health checks for simplicity. Move to separate-port (small 
 
 Keep liveness checks narrow. Do not let downstream-dependency health affect liveness. Use cheap probes (no-op RPCs, status reads), not load-generating ones.
 
-Test the shutdown path locally with `podman stop` before deploying. The pattern is mechanical; getting it wrong is an unforced error.
+Test the shutdown path locally with `docker stop` before deploying. The pattern is mechanical; getting it wrong is an unforced error.
 
 ## Cross-references
 
@@ -345,7 +345,7 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Kubernetes documentation, "Configure Liveness, Readiness and Startup Probes" (`kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/`).** The reference for the three-probe model and the configuration syntax. The native gRPC probe support (Kubernetes 1.24+) is documented here.
 
-**Podman `HEALTHCHECK` documentation.** The single-host counterpart to the Kubernetes probe model. Less feature-rich (one probe, not three) but the underlying semantics map cleanly.
+**Docker `HEALTHCHECK` documentation.** The single-host counterpart to the Kubernetes probe model. Less feature-rich (one probe, not three) but the underlying semantics map cleanly.
 
 **Geewax, *API Design Patterns*.** The chapters on standard methods cover the philosophical question of what kinds of operations belong as separate endpoints. The health-check protocol is a worked example.
 

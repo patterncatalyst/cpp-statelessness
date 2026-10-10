@@ -27,9 +27,9 @@ Convention: book references (Iglberger, Yonts, Enberg "Latency", Geewax "API Des
 
 Eleven observations recurred across topics and should be threaded through the doc set:
 
-1. **The orchestrator's view of "state" is different from the language's view of "state."** Podman/podman-compose (the project's primary stack) and Kubernetes both decide "stateless" by where data lives across restart: named volumes, bind mounts, tmpfs, ephemeral overlay. Kubernetes formalizes the distinction further via Deployment vs StatefulSet. None of that is enforced by C++. A binary with mutable globals, an on-disk cache, and a process-local session table can still be run as a stateless service if those globals don't survive restart in a way clients depend on. This is the single most important framing of the project.
+1. **The orchestrator's view of "state" is different from the language's view of "state."** Docker/Docker Compose (the project's primary stack) and Kubernetes both decide "stateless" by where data lives across restart: named volumes, bind mounts, tmpfs, ephemeral overlay. Kubernetes formalizes the distinction further via Deployment vs StatefulSet. None of that is enforced by C++. A binary with mutable globals, an on-disk cache, and a process-local session table can still be run as a stateless service if those globals don't survive restart in a way clients depend on. This is the single most important framing of the project.
 
-2. **Podman is primary; Kubernetes is noted where it differs.** Examples and `compose.yaml` snippets target podman-compose. Kubernetes differences are flagged inline when they meaningfully change the picture — probes (richer model vs Podman's `HEALTHCHECK`), Deployment vs StatefulSet (no real Podman analogue), ConfigMaps/Secrets (compose `env_file` and bind-mounts are the rough equivalent), and resource requests/limits (Podman uses `--cpus`, `--memory` and compose `deploy.resources`, Kubernetes uses `resources.requests`/`limits`). `podman generate kube` bridges the two when relevant.
+2. **Docker is primary; Kubernetes is noted where it differs.** Examples and `compose.yaml` snippets target Docker Compose. Kubernetes differences are flagged inline when they meaningfully change the picture — probes (richer model vs Docker's `HEALTHCHECK`), Deployment vs StatefulSet (no real Docker analogue), ConfigMaps/Secrets (compose `env_file` and bind-mounts are the rough equivalent), and resource requests/limits (Docker uses `--cpus`, `--memory` and compose `deploy.resources`, Kubernetes uses `resources.requests`/`limits`). `kompose` (third-party) bridges the two when relevant; Podman users get the same bridge natively via `podman generate kube`.
 
 3. **Request-scoped vs process-scoped state is the practical seam.** Everything operational in a C++ service slots into one or the other, and RAII is what enforces the seam cleanly. Per-request arenas (PMR), per-request span contexts, per-request DB transactions, per-request gRPC ServerContext — all destruction-on-scope-exit. Process-scoped things — channel caches, tracer providers, allocator pools — must be re-buildable from configuration on every cold start without correctness loss.
 
@@ -41,11 +41,11 @@ Eleven observations recurred across topics and should be threaded through the do
 
 7. **OS container requests and limits shape C++ behaviour in non-obvious ways.** CPU limits via cgroup CFS quotas mean `std::thread::hardware_concurrency()` returns the host's CPU count, not the budget you're actually allowed — a classic gotcha that produces oversubscription, throttling, and tail-latency spikes. Memory limits set the OOM threshold, which interacts with PMR upstream sizing, connection pool sizing, in-process cache sizing, and the allocator's arena strategy. Ephemeral-storage limits cap stdout log volume. Doc 04 covers this in depth; Doc 05 develops the threading consequences; other docs cross-reference.
 
-8. **"Container" is overloaded vocabulary.** `std::vector` is a container; an OCI/Podman/Docker container is a container; a Kubernetes container is a container inside a pod. Where ambiguity is possible, the docs say "std container" / "OS container" / "Kubernetes container" explicitly. This is more a writing convention than a finding, but worth establishing once.
+8. **"Container" is overloaded vocabulary.** `std::vector` is a container; an OCI/Docker/Podman container is a container; a Kubernetes container is a container inside a pod. Where ambiguity is possible, the docs say "std container" / "OS container" / "Kubernetes container" explicitly. This is more a writing convention than a finding, but worth establishing once.
 
 9. **C++ pays a "globals tax" that other 12-factor languages don't.** Static initialization order fiasco, global ctor pile-up at startup, Meyers-singleton synchronization on every call — these are real costs that affect cold-start latency under startup probes and that shape how config and dependencies should be wired. This is the gap the brief flagged ("No existing source treats this well"). Doc 06 covers it.
 
-10. **gRPC C++ is the through-line.** It's the canonical microservice transport in this stack, owns several of the process-scoped state hotspots (channels, completion queues, sub-channels), defines the health check protocol Kubernetes uses natively since 1.24 (Podman's `HEALTHCHECK` can invoke `grpc_health_probe` as a command), and its callback API is where modern code lives. Every doc except possibly the ephemeral-filesystem one will touch gRPC at some point.
+10. **gRPC C++ is the through-line.** It's the canonical microservice transport in this stack, owns several of the process-scoped state hotspots (channels, completion queues, sub-channels), defines the health check protocol Kubernetes uses natively since 1.24 (Docker's `HEALTHCHECK` can invoke `grpc_health_probe` as a command), and its callback API is where modern code lives. Every doc except possibly the ephemeral-filesystem one will touch gRPC at some point.
 
 11. **OTel + Grafana stack provides external observability that lets statelessness work.** When OS containers are interchangeable, logs/metrics/traces must aggregate externally. The OTel C++ SDK pattern (TracerProvider as process-scoped singleton, span context as request-scoped, span propagation often via TLS) maps onto both the request/process state model and the threading-scope discussion in Doc 05.
 
@@ -55,20 +55,20 @@ Eleven observations recurred across topics and should be threaded through the do
 
 ### Thesis to defend
 
-C++ doesn't impose state. Stateless is a property of the orchestrator's expectations and the observable contract with clients, not a property of the binary. The same binary can be run under podman-compose with `read_only: true` and no named volumes (effectively stateless), with named volumes that survive restart (locally stateful), or in Kubernetes as either a Deployment (interchangeable replicas) or a StatefulSet (stable identity, per-pod PVC). The decision lives in the orchestration manifest, not in the code. C++ developers from monolithic backgrounds frequently miss this and write code that "feels stateful" — process-local caches, in-memory session tables, mutable singletons — without realizing this is a deployment decision, not a code decision.
+C++ doesn't impose state. Stateless is a property of the orchestrator's expectations and the observable contract with clients, not a property of the binary. The same binary can be run under Docker Compose with `read_only: true` and no named volumes (effectively stateless), with named volumes that survive restart (locally stateful), or in Kubernetes as either a Deployment (interchangeable replicas) or a StatefulSet (stable identity, per-pod PVC). The decision lives in the orchestration manifest, not in the code. C++ developers from monolithic backgrounds frequently miss this and write code that "feels stateful" — process-local caches, in-memory session tables, mutable singletons — without realizing this is a deployment decision, not a code decision.
 
 ### Key findings
 
-- Podman/podman-compose: posture is implicit, decided by which volumes are named, whether `read_only: true` is set, whether `tmpfs:` is used, and whether `--replicas` is used. No first-class "stateless vs stateful" type.
+- Docker/Docker Compose: posture is implicit, decided by which volumes are named, whether `read_only: true` is set, whether `tmpfs:` is used, and whether `--replicas` is used. No first-class "stateless vs stateful" type.
 - Kubernetes formalizes the distinction in two API objects: Deployment (interchangeable pods, no stable identity, no per-pod PVC) and StatefulSet (ordinal identity, stable DNS `<name>-0`/`<name>-1`, per-pod PVC bound by ordinal). Both run the same OCI image; the manifest decides posture.
 - "Stateless" in cloud-native parlance means request-handling that doesn't depend on prior in-process state. It does NOT mean "no state anywhere" — backing stores are universal. Canonical reference: 12-factor "Processes" factor (`12factor.net/processes`).
 - The pattern most worth citing is "behind every scalable stateless service is a stateful one" (Kubernetes Patterns, ch. 11).
-- `podman generate kube` translates a running pod/container set into Kubernetes YAML, which is a useful bridge for moving from local dev to production.
+- `kompose` translates a Docker Compose file into Kubernetes YAML, a useful bridge for moving from local dev to production. (Podman users get the same bridge natively via `podman generate kube`.)
 
 ### Code-pattern anchors
 
 - A small gRPC service in C++20 whose handler is a pure function of its input. Same binary, three orchestration manifests:
-  - `compose.yaml` for podman-compose (primary).
+  - `compose.yaml` for Docker Compose (primary).
   - `deployment.yaml` for Kubernetes (production scale-out).
   - `statefulset.yaml` for Kubernetes (where ordinal identity matters).
 - A counterexample handler with a process-local `unordered_map` cache that silently breaks under multi-replica deployment.
@@ -213,14 +213,14 @@ This table should anchor the whole doc — it's the most useful single artifact 
 
 ### OS container requests and limits — the budget for process-scoped state
 
-This subsection is the one the user explicitly asked for. Every piece of process-scoped state has to fit inside an OS container's resource budget; that budget is set by the runtime (Podman flags or compose `deploy.resources`, Kubernetes `resources.requests`/`limits`). Several C++-specific gotchas:
+This subsection is the one the user explicitly asked for. Every piece of process-scoped state has to fit inside an OS container's resource budget; that budget is set by the runtime (Docker flags or compose `deploy.resources`, Kubernetes `resources.requests`/`limits`). Several C++-specific gotchas:
 
 - **CPU limits and `std::thread::hardware_concurrency()`.** This is the headline gotcha. On Linux, `hardware_concurrency()` typically returns the host CPU count, not the cgroup quota. A container with `--cpus=1` running gRPC's default thread-pool sizing (which uses `hardware_concurrency()` internally) will oversubscribe and pay CFS throttling penalties. Mitigations: read `/sys/fs/cgroup/cpu.max` (cgroup v2) or pass an explicit pool size via env var. Same gotcha applies to jemalloc/tcmalloc arena counts.
 - **Memory limits and the OOM killer.** Limit set via `--memory` or `mem_limit` in compose, or `resources.limits.memory` in k8s. C++ allocators don't know about this; once the limit is hit, the OOM killer terminates the process. Mitigations: size in-process caches conservatively, set PMR upstream sizing as a fraction of the memory limit, configure jemalloc/tcmalloc with explicit caps if used, monitor RSS via OTel.
 - **CPU requests vs limits.** Requests reserve scheduling capacity; limits cap consumption. Setting requests but not limits ("burstable") is the common pattern for stateless services. Setting limits == requests ("guaranteed" QoS in k8s) is right for latency-sensitive paths.
 - **`GOMEMLIMIT`-style soft limits.** Go has runtime-level memory limit awareness; C++ does not. There is no language-level equivalent. Mitigations: explicit allocator caps; cgroup-aware sizing logic in `main()`.
 - **Ephemeral-storage limits** cap writable-layer + emptyDir + container logs (Doc 08 covers this). A C++ service that writes verbose logs to stdout can blow the ephemeral-storage limit; mitigation is log-rate sampling or structured log levels.
-- **Podman vs Kubernetes specifics.** Podman: `--cpus`, `--memory`, `--memory-swap`, `--pids-limit` on the CLI; compose: `deploy.resources.limits` and `deploy.resources.reservations`. Kubernetes: `resources.requests` and `resources.limits` per container, plus pod-level `ephemeral-storage`. Semantics are mostly the same; the manifest syntax differs.
+- **Docker vs Kubernetes specifics.** Docker: `--cpus`, `--memory`, `--memory-swap`, `--pids-limit` on the CLI; compose: `deploy.resources.limits` and `deploy.resources.reservations`. Kubernetes: `resources.requests` and `resources.limits` per container, plus pod-level `ephemeral-storage`. Semantics are mostly the same; the manifest syntax differs.
 
 ### Sizing std containers against the limit
 
@@ -289,7 +289,7 @@ Threading is the dimension of statelessness that catches C++ developers off-guar
 
 **OS container CPU limits and thread budget — the deep version.**
 
-The Linux CFS scheduler enforces CPU limits via a quota/period mechanism. A container with `--cpus=2` (Podman) or `resources.limits.cpu: "2"` (Kubernetes) is given a quota of 200ms per 100ms period — meaning it can consume 200ms of aggregate CPU time before being throttled until the next period boundary. Thread parallelism does not beat this budget: eight threads each running 25ms in a 100ms period have already consumed the 200ms quota and the kernel suspends all of them until the next period boundary, which can be up to ~75ms away for whichever thread happened to be scheduled last.
+The Linux CFS scheduler enforces CPU limits via a quota/period mechanism. A container with `--cpus=2` (Docker) or `resources.limits.cpu: "2"` (Kubernetes) is given a quota of 200ms per 100ms period — meaning it can consume 200ms of aggregate CPU time before being throttled until the next period boundary. Thread parallelism does not beat this budget: eight threads each running 25ms in a 100ms period have already consumed the 200ms quota and the kernel suspends all of them until the next period boundary, which can be up to ~75ms away for whichever thread happened to be scheduled last.
 
 The consequences for C++ service design are concrete:
 
@@ -312,7 +312,7 @@ The default advice is "more headroom." Running close to the limit is usually the
 
 **Memory limits and thread stack budget.**
 
-Each `std::thread` defaults to a stack of 1MB on glibc, up to 8MB on some platforms. The stack is reserved as virtual memory but pages are only committed as used, so the impact on resident set size is smaller than the address-space reservation suggests. Even so, under tight memory limits (`--memory=256M` on Podman, `resources.limits.memory: "256Mi"` on Kubernetes), a 100-thread pool can commit hundreds of MB of address space, which interacts badly with gRPC's send/receive buffers, connection pools, the PMR upstream resource, and any in-process caches.
+Each `std::thread` defaults to a stack of 1MB on glibc, up to 8MB on some platforms. The stack is reserved as virtual memory but pages are only committed as used, so the impact on resident set size is smaller than the address-space reservation suggests. Even so, under tight memory limits (`--memory=256M` on Docker, `resources.limits.memory: "256Mi"` on Kubernetes), a 100-thread pool can commit hundreds of MB of address space, which interacts badly with gRPC's send/receive buffers, connection pools, the PMR upstream resource, and any in-process caches.
 
 Mitigations:
 
@@ -517,17 +517,17 @@ If the service is to be stateless, the state has to live somewhere — Redis, Po
 
 ### Thesis
 
-Writes to `/var`, `/tmp`, `/log`, or anywhere on the OS container's root filesystem disappear on restart. C++ devs from server backgrounds reach for filesystem-based caches, log files, work directories, lockfiles, and PID files without thinking — and the silent failure mode is the worst: it "works" until something rotates and weeks of data is gone. The hardening pattern, in both Podman and Kubernetes, is to make the rootfs immutable so writes fail loudly at first attempt — converting a latent disaster into an immediate, debuggable error.
+Writes to `/var`, `/tmp`, `/log`, or anywhere on the OS container's root filesystem disappear on restart. C++ devs from server backgrounds reach for filesystem-based caches, log files, work directories, lockfiles, and PID files without thinking — and the silent failure mode is the worst: it "works" until something rotates and weeks of data is gone. The hardening pattern, in both Docker and Kubernetes, is to make the rootfs immutable so writes fail loudly at first attempt — converting a latent disaster into an immediate, debuggable error.
 
 ### Key findings
 
 - Container rootfs is an overlay that dies with the OS container. Data written outside an explicit volume disappears.
-- **Podman: `--read-only` flag on `podman run`, or `read_only: true` in `compose.yaml` for the service.** Writes to the rootfs fail with `EROFS`. Combined with `tmpfs:` mounts for legitimately-writable paths (e.g., `/tmp`), this gives a clear "writes only where allowed" posture.
-- **Kubernetes: `securityContext.readOnlyRootFilesystem: true` on the container.** Combined with `emptyDir` (or generic ephemeral) volumes for any path that must be writable. Semantically equivalent to Podman.
-- Podman `tmpfs:` and Kubernetes `emptyDir: { medium: Memory }` both give RAM-backed temp space that counts against the memory limit, not disk. Useful for performance-sensitive tmp.
+- **Docker: `--read-only` flag on `docker run`, or `read_only: true` in `compose.yaml` for the service.** Writes to the rootfs fail with `EROFS`. Combined with `tmpfs:` mounts for legitimately-writable paths (e.g., `/tmp`), this gives a clear "writes only where allowed" posture.
+- **Kubernetes: `securityContext.readOnlyRootFilesystem: true` on the container.** Combined with `emptyDir` (or generic ephemeral) volumes for any path that must be writable. Semantically equivalent to Docker.
+- Docker `tmpfs:` and Kubernetes `emptyDir: { medium: Memory }` both give RAM-backed temp space that counts against the memory limit, not disk. Useful for performance-sensitive tmp.
 - Quirks: `emptyDir` is mounted world-writable without sticky bit, which breaks some Ruby/Java tmp-dir checks; the workaround is generic ephemeral volumes. Less of a concern in C++.
-- Resource limits: `resources.limits.ephemeral-storage` in k8s caps writable-layer + emptyDir + log volume. Podman has no direct equivalent but `--read-only` plus explicit `tmpfs` sizes provide similar bounding. C++ apps that write growing on-disk caches (e.g., RocksDB embedded) need explicit sizing either way.
-- Logs: 12-factor Factor XI says treat logs as event streams; in practice, C++ apps should write to stdout/stderr and let Podman/the orchestrator pick them up. Loki via Promtail/Alloy is the user's target.
+- Resource limits: `resources.limits.ephemeral-storage` in k8s caps writable-layer + emptyDir + log volume. Docker has no direct equivalent but `--read-only` plus explicit `tmpfs` sizes provide similar bounding. C++ apps that write growing on-disk caches (e.g., RocksDB embedded) need explicit sizing either way.
+- Logs: 12-factor Factor XI says treat logs as event streams; in practice, C++ apps should write to stdout/stderr and let Docker/the orchestrator pick them up. Loki via Promtail/Alloy is the user's target.
 
 ### Code-pattern anchors
 
@@ -545,7 +545,7 @@ Writes to `/var`, `/tmp`, `/log`, or anywhere on the OS container's root filesys
 ### Open questions
 
 - Should this include logging-to-stdout vs file-with-rotation comparison? **Yes — short section.**
-- Should rootless Podman get a callout? **Brief — UID mapping and `~/.local/share/containers` come up enough to warrant a paragraph.**
+- Should rootless Docker get a callout? **Brief — UID mapping (userns-remap) and `~/.local/share/docker` come up enough to warrant a paragraph. (Podman's rootless defaults differ further; noted where it matters.)**
 
 ---
 
@@ -553,27 +553,27 @@ Writes to `/var`, `/tmp`, `/log`, or anywhere on the OS container's root filesys
 
 ### Thesis
 
-Health endpoints are the contract between an "I am OK" process and its supervisor — Podman, Kubernetes, or a load balancer. They are part of the public surface of statelessness: they tell the supervisor "remove me," "restart me," or "send me traffic." The transports (HTTP, gRPC, exec-command) and probe types differ between Podman and Kubernetes, but the semantics — liveness ("am I still alive?") vs readiness ("am I ready to serve?") — are the same. The C++ side is the same in both cases.
+Health endpoints are the contract between an "I am OK" process and its supervisor — Docker, Kubernetes, or a load balancer. They are part of the public surface of statelessness: they tell the supervisor "remove me," "restart me," or "send me traffic." The transports (HTTP, gRPC, exec-command) and probe types differ between Docker and Kubernetes, but the semantics — liveness ("am I still alive?") vs readiness ("am I ready to serve?") — are the same. The C++ side is the same in both cases.
 
 ### Key findings
 
-- **Podman healthcheck model.** Single check definition in `Containerfile` (`HEALTHCHECK` directive) or compose (`healthcheck:` block) with `test:`, `interval:`, `timeout:`, `retries:`, `start_period:`. Test types: `CMD` (exec a command) and `CMD-SHELL`. The check produces a healthy/unhealthy state visible via `podman ps`. No native distinction between liveness and readiness — one check covers both.
+- **Docker healthcheck model.** Single check definition in `Containerfile` (`HEALTHCHECK` directive) or compose (`healthcheck:` block) with `test:`, `interval:`, `timeout:`, `retries:`, `start_period:`. Test types: `CMD` (exec a command) and `CMD-SHELL`. The check produces a healthy/unhealthy state visible via `docker ps`. No native distinction between liveness and readiness — one check covers both.
 - **Kubernetes probe model (richer).**
   - **startupProbe**: only runs during cold start; once it succeeds, liveness takes over. Use for C++ services with slow init (TracerProvider, channel pool, large data load).
   - **livenessProbe**: detects deadlock / unrecoverable state. Failure → container restart. Should be cheap and shallow — checking only "the event loop is responsive." A liveness probe that talks to the DB is an anti-pattern: DB outage cascades into pod-restart storms.
   - **readinessProbe**: detects "ready to serve" (warmed caches, connected to backends). Failure → removed from Service endpoints but NOT restarted. Can be deeper (depends-on checks).
-- **gRPC native probes.** Kubernetes since 1.24: `livenessProbe: { grpc: { port: 50051 } }`. Server implements the standard `grpc.health.v1.Health` service. Podman has no native gRPC probe but can invoke `grpc_health_probe` as a `CMD` healthcheck. The C++ server side is identical.
+- **gRPC native probes.** Kubernetes since 1.24: `livenessProbe: { grpc: { port: 50051 } }`. Server implements the standard `grpc.health.v1.Health` service. Docker has no native gRPC probe but can invoke `grpc_health_probe` as a `CMD` healthcheck. The C++ server side is identical.
 - **The standard gRPC Health Checking Protocol**: `Check(HealthCheckRequest{ service: "" })` returns `SERVING`/`NOT_SERVING`/`SERVICE_UNKNOWN`. Per-service health (`service: "MyService"`) lets multi-service binaries report granularly.
-- **Same-port vs separate-port.** Same port (gRPC service on 50051, health service on 50051): simpler manifest, fewer ports to expose. Separate port (gRPC on 50051, HTTP `/healthz` on 8080): lets you use HTTP probes even when the main service is gRPC, useful behind a service mesh that may TLS-terminate gRPC; also useful for splitting metrics endpoint, debug endpoints. Modern recommendation: same-port gRPC native probe unless there's a specific reason otherwise. Note Podman's single-check model: separate-port is harder to express usefully.
-- **What "alive" actually means.** Not "all dependencies are healthy" (that's readiness), but "this process is still responsive and not in an unrecoverable state." Common pitfall: a liveness probe that depends on Redis being up → Redis hiccup → cascading restarts. Liveness is local, readiness is dependency-aware. In Podman's single-check world, lean toward the liveness semantics and let the readiness aspect happen via separate metrics/log signals.
-- **Graceful shutdown.** Mark readiness as `NOT_SERVING` first, wait for in-flight requests to drain (gRPC `Server::Shutdown(deadline)`), then exit. This is the pattern that makes rolling deploys actually safe. Podman: `--stop-signal=SIGTERM --stop-timeout=30`. Kubernetes: `terminationGracePeriodSeconds: 30` plus a `preStop` hook if needed.
+- **Same-port vs separate-port.** Same port (gRPC service on 50051, health service on 50051): simpler manifest, fewer ports to expose. Separate port (gRPC on 50051, HTTP `/healthz` on 8080): lets you use HTTP probes even when the main service is gRPC, useful behind a service mesh that may TLS-terminate gRPC; also useful for splitting metrics endpoint, debug endpoints. Modern recommendation: same-port gRPC native probe unless there's a specific reason otherwise. Note Docker's single-check model: separate-port is harder to express usefully.
+- **What "alive" actually means.** Not "all dependencies are healthy" (that's readiness), but "this process is still responsive and not in an unrecoverable state." Common pitfall: a liveness probe that depends on Redis being up → Redis hiccup → cascading restarts. Liveness is local, readiness is dependency-aware. In Docker's single-check world, lean toward the liveness semantics and let the readiness aspect happen via separate metrics/log signals.
+- **Graceful shutdown.** Mark readiness as `NOT_SERVING` first, wait for in-flight requests to drain (gRPC `Server::Shutdown(deadline)`), then exit. This is the pattern that makes rolling deploys actually safe. Docker: `--stop-signal=SIGTERM --stop-timeout=30`. Kubernetes: `terminationGracePeriodSeconds: 30` plus a `preStop` hook if needed.
 
 ### Code-pattern anchors
 
 - A `HealthService` implementing `grpc::health::v1::Health` with per-service status via `grpc::HealthCheckServiceInterface`.
 - A startup sequence that sets `SERVING` only after the TracerProvider, channels, and connection pools are wired.
 - Graceful shutdown: signal handler → `health.SetServing(false)` → `server.Shutdown(deadline)` → tracer flush.
-- Podman compose snippet with `healthcheck:` using `grpc_health_probe` (primary).
+- Docker compose snippet with `healthcheck:` using `grpc_health_probe` (primary).
 - Kubernetes manifest with `startupProbe`/`livenessProbe`/`readinessProbe` using native gRPC probes (note).
 
 ### Book references
@@ -670,7 +670,7 @@ These were originally open questions; locked in before drafting started:
 3. **Code language standard.** C++20-portable as baseline; C++23 features called out where they meaningfully improve the example (`std::expected`, `std::flat_map`, `<stacktrace>`, `std::print`, `std::pmr::stacktrace`).
 4. **Tone.** Reference-style throughout, opinions clearly marked in `> **Opinion.**` callouts.
 5. **Drafting cadence.** One doc at a time with review checkpoints between each.
-6. **Container stack.** Podman + podman-compose as primary; Kubernetes-specific notes inline where they materially differ.
+6. **Container stack.** Docker + Docker Compose as primary; Kubernetes-specific notes inline where they materially differ.
 7. **Threading as a dedicated doc.** Doc 05 covers threading and concurrency in its own right; threaded through the others as cross-references.
 
 ---

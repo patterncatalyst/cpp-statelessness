@@ -8,26 +8,27 @@
 #   3. THE FIX: `app log-stdout` under --read-only exits 0 and emits logs
 #   4. EPHEMERALITY: `app check-file` in a fresh container reports absent
 #   5. SCRATCH: `app scratch /tmp` under --read-only --tmpfs /tmp exits 0
-#   (a soft check confirms scratch fails when no tmpfs is mounted; this
-#    depends on podman's --read-only-tmpfs default, so it never fails CI)
+#   6. SCRATCH (no tmpfs): `app scratch /tmp` under a bare --read-only exits
+#      non-zero. Docker's --read-only never auto-mounts a tmpfs the way
+#      Podman's --read-only-tmpfs default does, so this is a hard check here.
 
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/_helpers.sh"
 
-require podman
+require docker
 
 DEMO="$REPO_ROOT/examples/statelessness/08-ephemeral-filesystem"
 IMG=cpp-tut/stateless-08-ephemeral-filesystem:latest
 cd "$DEMO"
 
-cleanup() { log_step "removing image"; podman rmi -f "$IMG" 2>/dev/null || true; }
+cleanup() { log_step "removing image"; docker rmi -f "$IMG" 2>/dev/null || true; }
 trap cleanup EXIT
 
-run() { podman run --rm "$@"; }
+run() { docker run --rm "$@"; }
 
 log_step "Phase 1 — build the image"
-podman build -t "$IMG" -f Containerfile . >/dev/null
+docker build -t "$IMG" -f Containerfile . >/dev/null
 log_ok "image built"
 
 log_step "Phase 2 — the trap: file logger under --read-only must fail (EROFS)"
@@ -68,13 +69,13 @@ else
     printf '%s\n' "$out"; exit 1
 fi
 
-log_step "Phase 5 (soft) — scratch without a tmpfs should fail"
-if run --read-only --read-only-tmpfs=false "$IMG" app scratch /tmp >/dev/null 2>&1; then
-    log_warn "scratch /tmp succeeded without an explicit tmpfs — your podman"
-    log_warn "auto-mounted one (--read-only-tmpfs). Not a failure; just noting."
-else
-    log_ok "scratch correctly failed with no tmpfs mounted"
+log_step "Phase 6 — scratch without a tmpfs must fail (no auto-mount under Docker)"
+if run --read-only "$IMG" app scratch /tmp >/dev/null 2>&1; then
+    log_err "expected scratch to fail: Docker's --read-only never auto-mounts a tmpfs"
+    log_err "(Podman differs here: --read-only-tmpfs defaults to true)"
+    exit 1
 fi
+log_ok "scratch correctly failed under --read-only with no tmpfs mounted"
 
 log_step "RESULT"
 log_ok "statelessness/08-ephemeral-filesystem verified — read-only trap, stdout fix, ephemerality, tmpfs scratch"

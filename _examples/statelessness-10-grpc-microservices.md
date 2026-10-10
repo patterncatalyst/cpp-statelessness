@@ -70,7 +70,7 @@ Every block maps back to an earlier document:
 
 ```bash
 cd examples/statelessness/10-grpc-microservices
-podman compose -f compose.yml up --build   # or: ./demo.sh
+docker compose -f compose.yml up --build   # or: ./demo.sh
 ./demo.sh                                   # the three acts
 ./demo.sh --keep                            # leave the stack up afterward
 ./demo.sh --clean                           # tear down
@@ -79,14 +79,14 @@ podman compose -f compose.yml up --build   # or: ./demo.sh
 The demo brings up three services — `postgres`, `tax-svc`, and `pricing-svc`
 (the last two share one image). The first build compiles the gRPC chain
 (~5 min cold); a warm Conan cache is far faster. `PriceOrder` is driven by an
-in-image `pricing-client` via `podman exec`, so no host gRPC tooling is
+in-image `pricing-client` via `docker exec`, so no host gRPC tooling is
 needed.
 
 CI verification: `scripts/test-stateless-demo-10-grpc-microservices.sh`.
 
 ## What you'll see
 
-Actual output from a host run on Fedora 44 (GCC 14, Podman 5.x) —
+Actual output from a host run on Fedora 44 (GCC 14, Docker 29.x) —
 the three acts, with the real figures from the seeded data:
 
 ```

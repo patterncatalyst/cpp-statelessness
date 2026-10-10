@@ -17,10 +17,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/_helpers.sh"
 
-require podman curl
+require docker curl
 
 DEMO="$REPO_ROOT/examples/statelessness/02-raii"
-COMPOSE=(podman compose -f compose.yml)
+COMPOSE=(docker compose -f compose.yml)
 cd "$DEMO"
 
 cleanup() {

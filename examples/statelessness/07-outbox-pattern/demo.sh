@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-COMPOSE=(podman compose -f compose.yml)
+COMPOSE=(docker compose -f compose.yml)
 KEY="K1-$(date +%s)"   # unique per run so reruns start clean
 
 if (( CLEAN_ONLY )); then

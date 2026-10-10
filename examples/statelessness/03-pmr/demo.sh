@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-COMPOSE=(podman compose -f compose.yml)
+COMPOSE=(docker compose -f compose.yml)
 
 if (( CLEAN_ONLY )); then
     echo "==> Tearing down"; "${COMPOSE[@]}" down -v 2>/dev/null || true; exit 0

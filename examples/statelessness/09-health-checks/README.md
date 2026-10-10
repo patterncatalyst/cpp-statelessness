@@ -31,14 +31,14 @@ traffic routing.
 **Driving readiness at runtime.** `SIGUSR1` toggles the service's
 readiness between `SERVING` and `NOT_SERVING` *without* touching the
 server-wide status, so you can watch readiness drop (traffic would stop)
-while liveness stays green (no restart). `podman kill -s SIGUSR1` drives
+while liveness stays green (no restart). `docker kill -s SIGUSR1` drives
 it — symmetric with the `SIGTERM` handler.
 
 **Graceful shutdown** (the sequence from Doc 09). `SIGTERM` runs: flip
 readiness `NOT_SERVING` (stop new traffic) → `request_stop()` the
 background worker (Doc 05's `std::stop_token`) → `server->Shutdown(deadline)`
 to drain in-flight RPCs → reverse-order teardown (Doc 04) → exit 0.
-`podman stop` sends `SIGTERM`; you see the ordered drain in the logs.
+`docker stop` sends `SIGTERM`; you see the ordered drain in the logs.
 
 **A hermetic `health-probe`** ([`src/health_probe.cpp`](src/health_probe.cpp)).
 Rather than download the upstream `grpc_health_probe` binary, the example
@@ -68,7 +68,7 @@ details:
 ## Run it
 
 ```bash
-podman compose -f compose.yml up --build   # or: ./demo.sh
+docker compose -f compose.yml up --build   # or: ./demo.sh
 ./demo.sh                                   # the three acts
 ./demo.sh --keep                            # leave the stack up afterward
 ./demo.sh --clean                           # tear down
@@ -76,7 +76,7 @@ podman compose -f compose.yml up --build   # or: ./demo.sh
 
 The first build compiles the gRPC chain (~5 min cold); a warm Conan cache
 is far faster. The demo queries readiness with the in-image `health-probe`
-via `podman exec`, and liveness with `curl` against the published HTTP
+via `docker exec`, and liveness with `curl` against the published HTTP
 port — no host gRPC tooling needed.
 
 ## Files

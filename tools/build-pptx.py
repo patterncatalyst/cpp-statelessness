@@ -38,35 +38,41 @@ from lxml import etree
 
 
 # ============================================================================
-# Design tokens — extracted from the Quarkus deck
+# Design tokens — lgtm-presentation house style (Red Hat brand)
+#
+# Fonts: Red Hat Display (titles) / Red Hat Text (body) / Red Hat Mono (code).
+# Palette: house red #EE0000 accent + the documented role colors (svc blue,
+# data purple, platform teal, govern amber, danger deep-red) mapped onto this
+# deck's six existing accent slots, plus ink/body/caption/panel/grid/code
+# neutrals. See ~/.claude/skills/lgtm-presentation/references/theme.md.
 # ============================================================================
 
 class C:
-    """Color palette — dark navy + accent system."""
+    """Color palette — Red Hat house style (red accent + documented tokens)."""
     # Backgrounds
-    BG_TITLE_DARK    = RGBColor(0x1A, 0x2B, 0x3C)   # title slide bg
-    BG_SECTION_DARK  = RGBColor(0x0A, 0x16, 0x28)   # section divider bg
-    BG_HEADER_BAR    = RGBColor(0x1E, 0x6F, 0xC8)   # content slide header bar
-    BG_CODE_BLOCK    = RGBColor(0x0D, 0x21, 0x37)   # code block bg
-    BG_CARD_LIGHT    = RGBColor(0xEC, 0xF0, 0xF1)   # neutral light card
-    BG_CARD_SOFT     = RGBColor(0xE0, 0xE8, 0xF0)   # soft blue card
+    BG_TITLE_DARK    = RGBColor(0x15, 0x15, 0x15)   # title/closing bg — house "ink"
+    BG_SECTION_DARK  = RGBColor(0xAB, 0x00, 0x00)   # section divider bg — house "redDark"
+    BG_HEADER_BAR    = RGBColor(0xEE, 0x00, 0x00)   # content slide header bar — house red
+    BG_CODE_BLOCK    = RGBColor(0x15, 0x15, 0x15)   # code block bg — house "codeBg"
+    BG_CARD_LIGHT    = RGBColor(0xF4, 0xF4, 0xF4)   # neutral light card — house "panel"
+    BG_CARD_SOFT     = RGBColor(0xD2, 0xD2, 0xD2)   # soft card — house "grid"
 
     # Text
-    TEXT_DARK        = RGBColor(0x1A, 0x2B, 0x3C)   # body text on light bg
-    TEXT_LIGHT       = RGBColor(0xEC, 0xF0, 0xF1)   # body text on dark bg
+    TEXT_DARK        = RGBColor(0x15, 0x15, 0x15)   # body text on light bg — house "ink"
+    TEXT_LIGHT       = RGBColor(0xF4, 0xF4, 0xF4)   # body text on dark bg — house "panel"
     TEXT_WHITE       = RGBColor(0xFF, 0xFF, 0xFF)   # pure white
-    TEXT_MUTED       = RGBColor(0x90, 0xA4, 0xAE)   # muted secondary
+    TEXT_MUTED       = RGBColor(0x8A, 0x8A, 0x8A)   # muted secondary — house "pageNum"
 
-    # Accents
-    ACCENT_CYAN      = RGBColor(0x00, 0xBC, 0xD4)   # primary accent
-    ACCENT_BLUE      = RGBColor(0x1E, 0x6F, 0xC8)   # blue accent
-    ACCENT_GREEN     = RGBColor(0x27, 0xAE, 0x60)   # "after" / positive
-    ACCENT_RED       = RGBColor(0xE8, 0x48, 0x55)   # "before" / negative
-    ACCENT_ORANGE    = RGBColor(0xF5, 0xA6, 0x23)   # warnings
-    ACCENT_PURPLE    = RGBColor(0x9B, 0x59, 0xB6)   # tertiary
+    # Accents — the deck's six accent slots mapped onto the house role palette
+    ACCENT_CYAN      = RGBColor(0xEE, 0x00, 0x00)   # primary accent — house red/rest
+    ACCENT_BLUE      = RGBColor(0x00, 0x66, 0xCC)   # house "svc" blue
+    ACCENT_GREEN     = RGBColor(0x00, 0x6E, 0x6E)   # house "platform" teal
+    ACCENT_RED       = RGBColor(0xB7, 0x1C, 0x1C)   # "before" / negative — house "danger" deep-red
+    ACCENT_ORANGE    = RGBColor(0xB3, 0x6B, 0x00)   # warnings — house "govern" amber
+    ACCENT_PURPLE    = RGBColor(0x6A, 0x1B, 0x9A)   # house "data" purple
 
     # Demo cue color (distinctive — matches the "DEMO" pill style)
-    BG_DEMO_PILL     = RGBColor(0x27, 0xAE, 0x60)
+    BG_DEMO_PILL     = RGBColor(0xFF, 0xA0, 0x00)   # house "amber" perf-callout accent
 
 
 class F:
@@ -86,9 +92,9 @@ class F:
 
 
 class FontFam:
-    HEADER = "Calibri"
-    BODY   = "Calibri"
-    CODE   = "Consolas"
+    HEADER = "Red Hat Display"
+    BODY   = "Red Hat Text"
+    CODE   = "Red Hat Mono"
 
 
 # Slide dimensions: 16:9, 13.333" x 7.5"
@@ -251,11 +257,12 @@ def add_header_bar(slide, section_label: str, page_no: int, total_pages: int,
 
 
 def add_footer(slide, section_title: str, page_no: int, total_pages: int):
-    """Add the standard footer bar."""
+    """Add the standard footer bar — house footer convention (caption text,
+    page number in the house "pageNum" tone)."""
     footer_top = SLIDE_H - Inches(0.35)
     add_text(slide, Inches(0.4), footer_top,
              Inches(9), Inches(0.3),
-             f"Optimizing Modern C++ with Containers   |   {section_title}",
+             f"Stateless C++ Services   |   {section_title}",
              size=F.CAPTION, color=C.TEXT_MUTED,
              align=PP_ALIGN.LEFT, font=FontFam.BODY)
     add_text(slide, SLIDE_W - Inches(1.5), footer_top,
@@ -263,6 +270,35 @@ def add_footer(slide, section_title: str, page_no: int, total_pages: int):
              f"{page_no} / {total_pages}",
              size=F.CAPTION, color=C.TEXT_MUTED,
              align=PP_ALIGN.RIGHT, font=FontFam.BODY)
+
+
+def write_statelessness_notes(notes_path: Path, deck_label: str, lines: list[str]) -> None:
+    """Merge this deck's build-notes block into the shared
+    presentation/build-notes-statelessness.md, preserving any existing block
+    for the *other* statelessness deck.
+
+    The two statelessness decks (compendium + 101) build via separate entry
+    point scripts that each run this function independently, so a rebuild of
+    one deck must not clobber the other deck's documented block. Blocks are
+    keyed by an HTML comment marker; a repeat build of the same deck replaces
+    only its own marked block.
+    """
+    import re
+
+    begin, end = f"<!-- BEGIN:{deck_label} -->", f"<!-- END:{deck_label} -->"
+    block = begin + "\n" + "\n".join(lines) + "\n" + end
+
+    existing = notes_path.read_text() if notes_path.exists() else ""
+    pattern = re.compile(re.escape(begin) + r".*?" + re.escape(end), re.DOTALL)
+    if pattern.search(existing):
+        new_content = pattern.sub(block, existing)
+    elif existing.strip():
+        new_content = existing.rstrip("\n") + "\n\n" + block + "\n"
+    else:
+        new_content = "# Build notes — statelessness decks\n\n" + block + "\n"
+
+    notes_path.parent.mkdir(parents=True, exist_ok=True)
+    notes_path.write_text(new_content)
 
 
 def set_notes(slide, speaker_text: str) -> None:

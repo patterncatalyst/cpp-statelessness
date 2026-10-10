@@ -92,8 +92,8 @@ CI verification: `scripts/test-stateless-demo-03-pmr.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with GCC 14 and Podman
-5.x — the arena path, the benchmark, then the deliberate ASan trap firing:
+Representative output on a Fedora 44 host with GCC 14 and Docker
+29.x — the arena path, the benchmark, then the deliberate ASan trap firing:
 
 ```
 ==> mode=arena   (split payload, count tokens, free in bulk)

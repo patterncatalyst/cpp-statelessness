@@ -11,7 +11,7 @@ permalink: /examples/
         <h1>Runnable companions to the compendium.</h1>
         <p class="hero__lead">
             Every claim made in the compendium has a demo behind it.
-            Each demo is a self-contained Podman project with its own
+            Each demo is a self-contained Docker project with its own
             <code>./demo.sh</code>, its own Containerfile(s), and the
             CMake / Conan plumbing to build hermetically. Read the
             matching compendium chapter for context, then run the demo
@@ -52,7 +52,7 @@ permalink: /examples/
         <h2 class="section-heading">Running every demo</h2>
         <p>
             Clone the repo and invoke each <code>demo.sh</code> from its
-            directory. The scripts assume Podman 5.x rootless and a
+            directory. The scripts assume Docker and a
             handful of host tools (<code>hey</code>, <code>jq</code>,
             <code>curl</code>).
         </p>

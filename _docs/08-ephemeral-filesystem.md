@@ -15,7 +15,7 @@ The container filesystem is ephemeral. Anything written outside an explicitly-mo
 
 The right framing is that ephemerality is a feature, not a bug. It is the operational counterpart to the architectural property the rest of this doc set has been describing: a stateless service must be killable and replaceable; its filesystem inherits the same property. The fix is not to fight the model — pinning the container to a node, mounting `/var/log` to a shared filesystem, adding handlers that snapshot to disk before exit — but to embrace it. Logs go to stdout. Temporary files go to a tmpfs that is sized and recycled correctly. Files that must persist go to explicitly-named volumes. The rootfs is read-only, enforced by `read_only: true` in compose or `readOnlyRootFilesystem: true` in Kubernetes, so accidental writes fail loudly.
 
-This document covers the C++ patterns for getting that right: the container layer model that produces the ephemerality, the read-only-rootfs enforcement pattern, the specific C++ libraries that quietly write files in ways that will not survive a restart, the ephemeral-storage budget in Kubernetes, and the rootless Podman quirks that affect development workflows.
+This document covers the C++ patterns for getting that right: the container layer model that produces the ephemerality, the read-only-rootfs enforcement pattern, the specific C++ libraries that quietly write files in ways that will not survive a restart, the ephemeral-storage budget in Kubernetes, and the UID-mapping quirks that affect development workflows under a user-namespaced Docker (or Podman's rootless default).
 
 {% include excalidraw.html name="statelessness/08-ephemeral-filesystem" caption="The ephemeral filesystem: overlayfs scratch + tmpfs vanish on restart, only PVCs persist, logs to stdout." %}
 
@@ -23,9 +23,9 @@ This document covers the C++ patterns for getting that right: the container laye
 
 A container image is built as a stack of read-only layers. At runtime, the container runtime — runc, crun, or similar — adds a writable layer on top, implemented via overlayfs. Reads come from the topmost layer that contains the file; writes go to the writable layer. When the container exits, the writable layer is removed. Image layers persist (they belong to the image, not the container instance); the writable layer does not.
 
-This is true of Podman, Docker, Kubernetes' container runtimes, and any OCI-compliant implementation. The semantics are uniform. What varies is the syntax for enforcing read-only on the rootfs, for adding tmpfs mounts, and for adding persistent volumes.
+This is true of Docker, Podman, Kubernetes' container runtimes, and any OCI-compliant implementation. The semantics are uniform. What varies is the syntax for enforcing read-only on the rootfs, for adding tmpfs mounts, and for adding persistent volumes.
 
-For a Podman compose file:
+For a Docker Compose file:
 
 ```yaml
 services:
@@ -82,7 +82,7 @@ spec:
       claimName: my-service-cache
 ```
 
-The two are semantically equivalent: rootfs read-only, `/tmp` writable as tmpfs with a size cap, a persistent volume mounted at a specific path. The Kubernetes side adds `ephemeral-storage` resource accounting, which has no direct Podman analogue.
+The two are semantically equivalent: rootfs read-only, `/tmp` writable as tmpfs with a size cap, a persistent volume mounted at a specific path. The Kubernetes side adds `ephemeral-storage` resource accounting, which has no direct Docker analogue.
 
 The forcing function — turning on read-only rootfs from day one — is the most useful single configuration choice in this space. Without it, accidental writes to `/var/log/` or `/opt/cache/` succeed silently in development and disappear silently in production. With it, the same writes fail loudly with `EROFS`, which surfaces during testing and gets fixed before deploy.
 
@@ -104,7 +104,7 @@ The lifetime contract for each category is explicit. The C++ code can rely on `/
 
 The 12-factor logs-as-event-streams principle ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})) is the clearest case where C++ instinct collides with container reality. The monolith pattern is to write structured logs to `/var/log/myservice/myservice.log` and let `logrotate` handle rotation. In a container with a read-only rootfs, that write fails. With a writable rootfs, the write succeeds but disappears on restart.
 
-The fix is `stdout`. The container runtime captures the process's stdout and stderr, ships them to a logging driver (Podman's `journald` or `json-file` driver, Kubernetes' container-runtime-managed logs), which forwards to Loki or whatever aggregator the deployment uses. The application does not own log rotation; the orchestrator does.
+The fix is `stdout`. The container runtime captures the process's stdout and stderr, ships them to a logging driver (Docker's `json-file` or `journald` driver, Kubernetes' container-runtime-managed logs), which forwards to Loki or whatever aggregator the deployment uses. The application does not own log rotation; the orchestrator does.
 
 For spdlog — the most common modern C++ logging library — the configuration looks like:
 
@@ -136,7 +136,7 @@ The first is **logging library defaults**. spdlog's `basic_logger_mt("name", "lo
 
 > **Run this pattern.** A runnable companion lives at
 > [`examples/statelessness/08-ephemeral-filesystem/`]({{ '/examples/statelessness-08-ephemeral-filesystem/' | relative_url }}).
-> One spdlog binary run under different `podman run` flags: `log-file`
+> One spdlog binary run under different `docker run` flags: `log-file`
 > hits exactly the `basic_logger_mt` `EROFS` trap above under
 > `--read-only`; `log-stdout` is the `stdout_color_sink_mt` fix and runs
 > cleanly; `check-file` in a fresh container shows a writable-rootfs
@@ -183,29 +183,31 @@ When the limit is exceeded, the pod is evicted. The eviction is graceful — the
 
 For a C++ service the common path to exceeding the budget is log volume. A service that writes 100 log lines per second at 200 bytes each produces about 1.6 GB per day of log output. Even if the orchestrator ships logs to Loki, the local copy is retained briefly (typically until it hits a per-file size limit and rotates), and rotated files accumulate against the ephemeral-storage budget until they're shipped and deleted.
 
-The mitigations are structural: structured log levels (`info` in production, not `debug`), rate sampling on high-volume events (one in 100 cache-miss messages logged, all errors logged), and ensuring the logging driver ships aggressively enough that rotated files don't accumulate. [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers Loki's promtail configuration for the Podman/compose side; Kubernetes uses Fluent Bit or similar.
+The mitigations are structural: structured log levels (`info` in production, not `debug`), rate sampling on high-volume events (one in 100 cache-miss messages logged, all errors logged), and ensuring the logging driver ships aggressively enough that rotated files don't accumulate. [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers Loki's promtail configuration for the Docker/compose side; Kubernetes uses Fluent Bit or similar.
 
-Podman does not have a direct ephemeral-storage limit equivalent. The host filesystem is the limit, and runaway log volume on a development machine fills the disk. The mitigation is the same — structured levels and sampling — but the enforcement is host-level rather than per-container.
+Docker does not have a direct ephemeral-storage limit equivalent. The host filesystem is the limit, and runaway log volume on a development machine fills the disk. The mitigation is the same — structured levels and sampling — but the enforcement is host-level rather than per-container.
 
-## Rootless Podman and the UID story
+## User-namespace remapping and the UID story
 
-Podman supports rootless operation by default — the daemon (or daemonless equivalent) runs as the invoking user, and containers run with that user's UID by default. This has consequences for the filesystem story.
+Standard Docker Engine runs the daemon as root and, by default, does **not** remap container UIDs to a different range on the host. A container process running as UID 1000 writes files that show up as UID 1000 on the host too — no surprises, no offset. That's simpler than Podman's story, but it's also less isolation: a process that escapes the container runs with the UID it had inside.
 
-The container image typically declares a `USER` directive — `USER 1000` or `USER service`. When running rootless, Podman maps that UID inside the container to a different UID outside, via `/etc/subuid` and `/etc/subgid`. The mapping is automatic but the file ownership it produces can be surprising:
+Docker can opt into the same kind of UID remapping Podman defaults to, two ways: **user namespace remapping** (`userns-remap` in `/etc/docker/daemon.json`) on a normal rootful install, or running the daemon itself unprivileged (**rootless Docker**, via `dockerd-rootless-setuptool.sh`). Either way the mechanism is the one Podman uses too: `/etc/subuid` and `/etc/subgid` define a range of host UIDs the container's UID space maps into, offset by some base (commonly 100000+). The container image typically declares a `USER` directive — `USER 1000` or `USER service`. With remapping on, that UID maps to a different UID outside, and the file ownership it produces can be surprising:
 
 ```bash
-$ podman run --rm -v $PWD:/data -u 1000 alpine touch /data/file
+$ docker run --rm -v $PWD:/data -u 1000 alpine touch /data/file
 $ ls -la file
 -rw-r--r--  1 100999  100999  0 Nov  2 10:24 file
 ```
 
-The file is owned by UID 100999 from the host's perspective — the rootless UID-map's offset of the container's UID 1000. From inside any future container with the same user mapping, it's owned by UID 1000. From the host shell, it looks weird.
+The file is owned by UID 100999 from the host's perspective — the remap's offset of the container's UID 1000. From inside any future container with the same mapping, it's owned by UID 1000. From the host shell, it looks weird.
 
-For development workflows this affects bind mounts. Code edited on the host and bind-mounted into the container must have permissions that allow the in-container user to read or write it. Source code mounted read-only is straightforward; cache directories mounted writable need either the container UID to match the host UID (run as the developer, not as a service user) or explicit `chown` on container start.
+For development workflows this affects bind mounts whenever remapping is active. Code edited on the host and bind-mounted into the container must have permissions that allow the in-container user to read or write it. Source code mounted read-only is straightforward; cache directories mounted writable need either the container UID to match the host UID (run as the developer, not as a service user) or explicit `chown` on container start.
 
-For production this rarely matters — production images run as a fixed UID, persistent volumes are sized and permissioned at provisioning time, no host bind mounts exist. The rootless story is primarily a development concern.
+For production this rarely matters — production images run as a fixed UID, persistent volumes are sized and permissioned at provisioning time, no host bind mounts exist. The UID-remapping story is primarily a development concern, and only surfaces when remapping is actually turned on.
 
-Rootless Podman storage lives under `~/.local/share/containers/storage/` on the host. Image layers, container writable layers, volumes — all under there. The default volume driver creates volume directories with the appropriate UID mapping; bind mounts use the host paths directly. Knowing this is useful for cleanup (`podman system prune`) and for understanding where space goes.
+Rootless Docker storage lives under `~/.local/share/docker/` on the host (vs. `/var/lib/docker/` for a standard rootful install). Image layers, container writable layers, volumes — all under there. Knowing this is useful for cleanup (`docker system prune`) and for understanding where space goes.
+
+**Podman differs here:** Podman's rootless mode is the default, not an opt-in — every Podman user hits the UID-remap story on day one, with storage under `~/.local/share/containers/storage/` and cleanup via `podman system prune`. Docker's remap is opt-in, so most Docker installs never produce a UID 100999 in `ls -la` output at all. Once either engine is actually in remapped mode, the mechanism and the mitigation are identical.
 
 ## Detecting filesystem writes at startup
 
@@ -248,11 +250,11 @@ The data-loss-on-restart property is sometimes treated as a problem to mitigate.
 
 The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})). The container's writable storage is for transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
 
-The exception is services that own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Podman, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
+The exception is services that own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Docker, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
 
 ## Recommendation summary
 
-Enable `read_only: true` (Podman compose) or `readOnlyRootFilesystem: true` (Kubernetes) from day one. Treat any write that fails as a bug in the application code, not a configuration to relax.
+Enable `read_only: true` (Docker Compose) or `readOnlyRootFilesystem: true` (Kubernetes) from day one. Treat any write that fails as a bug in the application code, not a configuration to relax.
 
 Mount `/tmp` (and `/run` if needed) as tmpfs, sized explicitly. Anything temporary goes there.
 
@@ -262,9 +264,9 @@ Send all logs to stdout, structured JSON. Configure spdlog (or equivalent) at st
 
 Write crash dumps and fatal stacktraces to stderr, not to files. C++23's `<stacktrace>` makes this straightforward.
 
-In Kubernetes, set explicit `ephemeral-storage` requests and limits. Aim for sustained log volume well under the limit, with headroom for spikes. In Podman, monitor host disk usage instead.
+In Kubernetes, set explicit `ephemeral-storage` requests and limits. Aim for sustained log volume well under the limit, with headroom for spikes. In Docker, monitor host disk usage instead.
 
-For rootless Podman in development, plan for the UID-mapping consequences when bind-mounting host directories. In production, this rarely matters.
+If you turn on Docker's user-namespace remapping (or run fully rootless) in development, plan for the UID-mapping consequences when bind-mounting host directories. In production, this rarely matters.
 
 Run a small startup self-check that verifies the filesystem assumptions match reality. Fail fast on mismatch; warn on writable-rootfs misconfiguration.
 
@@ -289,7 +291,7 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Kubernetes documentation, "Local Ephemeral Storage" (`kubernetes.io/docs/concepts/configuration/manage-resources-containers/#local-ephemeral-storage`).** The reference for the `ephemeral-storage` resource model, including how the writable layer, `emptyDir`, and container logs are accounted.
 
-**Podman documentation on `--read-only`, `--tmpfs`, and rootless storage.** The single-host equivalent. The rootless-mode documentation under `podman.io/docs/rootless` covers the UID-mapping story in detail.
+**Docker documentation on `--read-only`, `--tmpfs`, user namespace remapping, and rootless mode.** The single-host equivalent. Podman's rootless-mode documentation under `podman.io/docs/rootless` covers the same UID-mapping story for a runtime where it's the default rather than opt-in.
 
 **spdlog documentation (`github.com/gabime/spdlog`).** The README and the wiki cover sink configuration, structured patterns, and the asynchronous logger options. The default examples use file sinks; the stdout sink is the right default for container deployments.
 

@@ -23,7 +23,11 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2'
+          # Keep in sync with the Gemfile: jekyll ~> 4.3 supports Ruby 3.1-3.4+,
+          # and the Gemfile shims (csv/bigdecimal/base64/logger/webrick) cover
+          # the default-gem removals on 3.4+. 3.3 is a stable LTS-track runner
+          # default with full bundler-cache support.
+          ruby-version: '3.3'
           bundler-cache: true
 
       - name: Setup Pages

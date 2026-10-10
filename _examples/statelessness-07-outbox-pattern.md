@@ -89,7 +89,7 @@ CI verification: `scripts/test-stateless-demo-07-outbox-pattern.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Podman 5.x — a create that
+Representative output on a Fedora 44 host with Docker 29.x — a create that
 writes order + outbox atomically, the relay publishing it, the consumer
 applying it, then a duplicate event being deduped:
 

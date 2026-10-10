@@ -79,7 +79,7 @@ backends differ:
 ## Run it
 
 ```bash
-podman compose -f compose.yml up --build   # or: ./demo.sh
+docker compose -f compose.yml up --build   # or: ./demo.sh
 ./demo.sh                                   # the three acts
 ./demo.sh --keep                            # leave the stack up
 ./demo.sh --clean                           # tear down
@@ -87,7 +87,7 @@ podman compose -f compose.yml up --build   # or: ./demo.sh
 
 The first build compiles the gRPC chain (~5 min cold); a warm Conan cache
 is far faster. The demo drives `PriceOrder` with the in-image
-`pricing-client` via `podman exec` — no host gRPC tooling needed.
+`pricing-client` via `docker exec` — no host gRPC tooling needed.
 
 ## The three acts
 

@@ -4,9 +4,9 @@
 # No observability stack: the PMR mechanics are visible in the
 # service's own stdout and the bench numbers come back in the RPC
 # response. The standalone pmr-trap binary (the lifetime-trap demo) is
-# baked into the same image and run via `podman compose exec`.
+# baked into the same image and run via `docker compose exec`.
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
 # Tear down:  ./demo.sh --clean
 

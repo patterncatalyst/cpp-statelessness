@@ -8,14 +8,18 @@ source "https://rubygems.org"
 # the meta-gem bundled gives the same output without the pin.
 gem "jekyll", "~> 4.3"
 
-# Ruby 3.4+ dropped these from the default gems; jekyll/webrick still need them.
-gem "csv"
-gem "bigdecimal"
-gem "base64"
-gem "logger"
+# Ruby 3.4+ dropped these from the default gems; jekyll still needs them.
+gem "csv"        # Jekyll::Utils and liquid-tag CSV parsing
+gem "bigdecimal"  # transitive dep of jekyll-sass-converter's protobuf backend
+gem "base64"      # used by jekyll core for asset/content hashing
+gem "logger"      # used by jekyll's own logger and the listen gem (serve mode)
 
+# Ruby 3.0+ dropped the bundled HTTP server; `jekyll serve` needs it explicitly.
+gem "webrick"
+
+# Keep this group in exact sync with the `plugins:` list in _config.yml —
+# do not add plugins the site doesn't declare/use there.
 group :jekyll_plugins do
-  gem "jekyll-feed"
   gem "jekyll-seo-tag"
   gem "jekyll-sitemap"
   gem "jekyll-redirect-from"

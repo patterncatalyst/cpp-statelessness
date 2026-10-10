@@ -42,6 +42,7 @@ C, F, FontFam = bp.C, bp.F, bp.FontFam
 SLIDE_W, SLIDE_H = bp.SLIDE_W, bp.SLIDE_H
 
 OUT_PATH = ROOT / "presentation" / "cpp-statelessness-101.pptx"
+NOTES_PATH = ROOT / "presentation" / "build-notes-statelessness.md"
 REPO_URL = "github.com/patterncatalyst/cpp-statelessness"
 
 
@@ -149,7 +150,7 @@ def build_closing(prs, total):
                   "builds process scope and external state out just as far.",
              size=Pt(18), color=C.TEXT_LIGHT, font=FontFam.BODY, space_before=Pt(10)),
         dict(text="Eleven documents, every pattern with a runnable, "
-                  "host-verified Podman demo.", size=Pt(18),
+                  "host-verified Docker demo.", size=Pt(18),
              color=C.ACCENT_GREEN, font=FontFam.BODY, space_before=Pt(10)),
     ])
     bp.add_text(slide, Inches(1.0), Inches(5.6), Inches(11.3), Inches(0.5),
@@ -206,6 +207,16 @@ def main():
     prs.save(str(OUT_PATH))
     print(f"\nSaved: {OUT_PATH}")
     print(f"Slide count: {page - 1}")
+    bp.write_statelessness_notes(NOTES_PATH, "101", [
+        "## cpp-statelessness-101.pptx (the on-ramp deck)",
+        "",
+        f"- Total slides: {page - 1}",
+        f"- Sections rendered: {len(SECTIONS)}",
+        "- Generator: tools/build-statelessness-101-pptx.py",
+        "- Content source: tools/sections_statelessness_101.py",
+        "- Shared builders: tools/build-pptx.py (loaded via importlib)",
+    ])
+    print(f"Wrote: {NOTES_PATH}")
 
 
 if __name__ == "__main__":

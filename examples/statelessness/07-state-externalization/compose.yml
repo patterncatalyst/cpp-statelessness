@@ -5,7 +5,7 @@
 # order-svc waits for Postgres to be healthy (depends_on) AND retries the
 # connection at startup, so it tolerates the database still coming up.
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
 # Tear down:  ./demo.sh --clean
 

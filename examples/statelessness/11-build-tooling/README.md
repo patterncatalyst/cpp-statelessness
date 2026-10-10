@@ -58,15 +58,18 @@ compendium page.
 ## Run it
 
 ```bash
-podman compose -f compose.yml build   # build + run the gtest gate
+docker compose -f compose.yml build   # build + run the gtest gate
 ./demo.sh                              # tests + the cap sweep
 ./demo.sh --clean                      # remove the image
 ```
 
 The first build compiles GoogleTest (~30s); the helpers and demo are tiny.
 
-> **A note on `in_container()`.** Under rootless podman you'll likely see
-> `in_container() : false` *even inside the container* — its
+> **A note on `in_container()`.** Under a standard rootful Docker install
+> you should see `in_container() : true` — `/proc/1/cgroup` carries a
+> `/docker/` (or `.scope`) marker the heuristic matches directly. Under a
+> rootless engine (rootless Docker, or Podman's rootless default) you'll
+> likely see `in_container() : false` *even inside the container* — its
 > `/proc/1/cgroup` reads `0::/` with none of the docker/libpod/`.scope`
 > markers the heuristic sniffs for. That's a known limitation of
 > cgroup-path detection under rootless user namespaces, not a bug here. It

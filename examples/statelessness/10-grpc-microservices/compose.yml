@@ -11,7 +11,7 @@
 # tax-svc and pricing-svc are the SAME image (built once via pricing-svc)
 # running different commands.
 #
-# Bring up:   podman compose -f compose.yml up --build
+# Bring up:   docker compose -f compose.yml up --build
 # Drive it:   ./demo.sh
 # Tear down:  ./demo.sh --clean
 

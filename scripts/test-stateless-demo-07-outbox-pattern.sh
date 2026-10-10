@@ -13,16 +13,16 @@
 #      still holds exactly one row and the consumer logs "duplicate"
 #
 # Idempotency is exercised without kcat — the relay's produce mode
-# injects the duplicate directly, so CI needs only podman + curl.
+# injects the duplicate directly, so CI needs only docker + curl.
 
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib/_helpers.sh"
 
-require podman curl
+require docker curl
 
 DEMO="$REPO_ROOT/examples/statelessness/07-outbox-pattern"
-COMPOSE=(podman compose -f compose.yml)
+COMPOSE=(docker compose -f compose.yml)
 KEY="K1-$(date +%s)"
 cd "$DEMO"
 
