@@ -18,7 +18,7 @@ gate) assert on specific transcript markers.
 | 4 | 11-build-tooling | examples/.../11-build-tooling/demo.sh (grep); --clean after | PASS — gtest 15/15; cpu 22→1.5→0.5 w/ hw_concurrency=22, mem=256.0MiB; --clean ran |
 | 5 | 02-raii | scripts/test-stateless-demo-02-raii.sh | PASS — exit 0 + "RAII cleanup on every exit path"; acquire=3 release=3 balanced |
 | 6 | 03-pmr | scripts/test-stateless-demo-03-pmr.sh (require literal heap-use-after-free) | PASS — real ASan run, literal "heap-use-after-free" caught (not shadow-memory fallback) |
-| 7 | 04-process-scoped-state | scripts/test-stateless-demo-04-process-scoped-state.sh | pending |
+| 7 | 04-process-scoped-state | scripts/test-stateless-demo-04-process-scoped-state.sh | PASS — exit 0 + "composition root, bounded cache, reverse teardown"; cache 4/4 w/ 4 evictions |
 | 8 | 07-state-externalization | scripts/test-stateless-demo-07-state-externalization.sh | pending |
 | 9 | 08-ephemeral-filesystem | scripts/test-stateless-demo-08-ephemeral-filesystem.sh | pending |
 | 10 | 05-threading (prior smoke pass) | scripts/test-stateless-demo-05-threading.sh | pending |
