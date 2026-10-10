@@ -102,7 +102,7 @@ trap itself — the bug is real regardless.
 └── demo.sh                  the driver
 ```
 
-## What this example deliberately leaves out
+## What this example leaves out
 
 - **The connection-pool / cache fix** for the lifetime trap — that's
   [`07-state-externalization`](../07-state-externalization/) (Doc 07).

@@ -82,6 +82,8 @@ docker compose -f compose.yml build   # build + run the gtest gate
 The first build compiles GoogleTest (~30 s); the helpers and demo are tiny.
 GoogleTest is the only Conan dependency, and it's test-only.
 
+CI verification: `scripts/test-stateless-demo-11-build-tooling.sh`.
+
 ## What you'll see
 
 Actual output from a host run on Fedora 44 (GCC 14, 22 logical cores,

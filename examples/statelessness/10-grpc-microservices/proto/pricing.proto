@@ -1,4 +1,4 @@
-// The order-pricing service — the capstone's public API (Doc 10).
+// The order-pricing service — the end-to-end example's public API (Doc 10).
 //
 // PriceOrder takes a customer and line items, looks up the customer in
 // PostgreSQL, prices each item, calls the tax service over gRPC, and

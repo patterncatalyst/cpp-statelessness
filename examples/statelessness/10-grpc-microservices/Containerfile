@@ -1,7 +1,7 @@
-# statelessness/10-grpc-microservices — the gRPC capstone.
+# statelessness/10-grpc-microservices — the gRPC end-to-end example.
 #
 # Builds three binaries from one image:
-#   pricing-svc    the capstone: PriceOrder over gRPC; PostgreSQL via libpq;
+#   pricing-svc    the end-to-end example: PriceOrder over gRPC; PostgreSQL via libpq;
 #                  outbound gRPC to the tax service; health + graceful drain.
 #   tax-svc        the outbound upstream the pricing service calls.
 #   health-probe   our own minimal grpc_health_probe (from proto/health.proto)
@@ -11,7 +11,7 @@
 #   libpq                      system, UBI AppStream (libpq-devel)
 #
 # No EPEL, no Kafka, no Redis, no OpenTelemetry, no libpqxx — see the README
-# for what the buildable capstone represents structurally vs Doc 10. The
+# for what the buildable end-to-end example represents structurally vs Doc 10. The
 # first build compiles the gRPC chain (~5 min cold); a warm Conan cache is
 # far faster.
 

@@ -30,7 +30,7 @@ construction order.
 constructor parameters and reaches them through members. `main()` owns
 them; the service borrows them.
 
-**Correct teardown for free.** Because dependencies are constructed
+**Correct teardown from construction order.** Because dependencies are constructed
 before the things that use them, RAII destroys them in the exact reverse
 order at process exit — `server → service → cache → metrics → config` —
 which is *also* the correct shutdown order: the server stops first (so

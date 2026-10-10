@@ -1,4 +1,4 @@
-// pricing_svc.cpp — the order-pricing capstone (Doc 10).
+// pricing_svc.cpp — the order-pricing end-to-end example (Doc 10).
 //
 // This is the integration example: it composes every prior pattern into one
 // realistic gRPC service.

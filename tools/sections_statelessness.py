@@ -270,7 +270,7 @@ SECTIONS = [
                 bullet("Measure the constructor: it runs on every request, in the latency path"),
             ],
             "notes": (
-                "RAII has no inherent cost — it's just scope-bound destruction. "
+                "RAII's own cost is scope-bound destruction, nothing more. "
                 "But the per-request object runs its constructor on every "
                 "request, so what you put in it matters. A short std::string "
                 "member fits in the small-string buffer and costs nothing; a "
@@ -291,9 +291,8 @@ SECTIONS = [
             "demo_url": "patterncatalyst.github.io/cpp-statelessness/examples/statelessness-02-raii/",
             "notes": (
                 "Watch the destructor log line appear once per request "
-                "regardless of which exit path the handler took. The point "
-                "isn't that RAII is clever — it's that the cleanup is "
-                "path-independent, which is exactly the property a "
+                "regardless of which exit path the handler took. The cleanup "
+                "is path-independent — exactly the property a "
                 "request-scoped resource needs."),
         },
     ],
@@ -366,8 +365,8 @@ SECTIONS = [
                      size=Pt(15), italic=True, color=C.TEXT_MUTED),
             ],
             "notes": (
-                "PMR isn't a separate container library — it's the same std:: "
-                "containers with a runtime-polymorphic allocator. You pass the "
+                "PMR is the same std:: containers with a runtime-polymorphic "
+                "allocator, not a separate container library. You pass the "
                 "arena's memory_resource to the container's constructor and "
                 "every allocation it makes comes from the arena. pmr::vector is "
                 "the one you'll reach for most; pmr::flat_map in C++23 gives you "
@@ -552,8 +551,8 @@ SECTIONS = [
                 "period. If your thread pool has more runnable threads than the "
                 "quota allows, the kernel throttles the whole cgroup: it stops "
                 "scheduling your threads until the next period. The symptom "
-                "isn't lower average throughput — it's vicious p99 spikes as "
-                "requests stall waiting for the next quota refill."),
+                "is vicious p99 spikes as requests stall waiting for the "
+                "next quota refill, not lower average throughput."),
         },
         {
             "kind": "content",

@@ -1,9 +1,9 @@
-# statelessness/10-grpc-microservices — the gRPC capstone.
+# statelessness/10-grpc-microservices — the gRPC end-to-end example.
 #
 # Three services compose the end-to-end story:
 #   postgres     customers + products + idempotency (SCLorg image)
 #   tax-svc      the outbound gRPC upstream (tax.v1.TaxService on :50052)
-#   pricing-svc  the capstone (pricing.v1.Pricing on :50051) — looks up the
+#   pricing-svc  the end-to-end example (pricing.v1.Pricing on :50051) — looks up the
 #                customer + product prices in Postgres, calls tax-svc over
 #                gRPC with the request deadline propagated, returns a priced
 #                order; idempotent on the client key.

@@ -84,6 +84,8 @@ far faster. The demo queries readiness with the in-image `health-probe` via
 `docker exec`, and liveness with `curl` against the published HTTP port — no
 host gRPC tooling needed.
 
+CI verification: `scripts/test-stateless-demo-09-health-checks.sh`.
+
 ## What you'll see
 
 Representative output on a Fedora 44 host with Docker 29.x — staged startup,

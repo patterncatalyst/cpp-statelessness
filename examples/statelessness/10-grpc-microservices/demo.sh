@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# demo.sh — statelessness/10-grpc-microservices (the gRPC capstone)
+# demo.sh — statelessness/10-grpc-microservices (the gRPC end-to-end example)
 #
 # Drives the order-pricing service end to end. Each PriceOrder call composes:
 #   - a customer lookup in PostgreSQL (libpq pool, deadline-propagated)

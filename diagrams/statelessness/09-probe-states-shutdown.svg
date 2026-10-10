@@ -18,7 +18,7 @@
   <rect width="920" height="590" fill="url(#grid)" opacity="0.4"/>
   <text x="460" y="30" text-anchor="middle" style="font: 700 16px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Health states and the graceful-shutdown sequence</text>
   <text x="60" y="80" text-anchor="start" style="font: 700 14px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">State machine</text>
-  <rect x="60" y="95" width="175" height="64" rx="6" ry="6" fill="#f0e8d8" stroke="#b89540" stroke-width="1.5"/>
+  <rect x="60" y="95" width="175" height="64" rx="6" ry="6" fill="#faf0e6" stroke="#a06030" stroke-width="1.5"/>
   <text x="147.5" y="115" text-anchor="middle" style="font: 700 14px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Starting</text>
   <text x="147.5" y="133" text-anchor="middle" style="font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #444444;">live: 200</text>
   <text x="147.5" y="147" text-anchor="middle" style="font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #444444;">ready: NOT_SERVING</text>
@@ -30,7 +30,7 @@
   <text x="417.5" y="215" text-anchor="middle" style="font: 700 14px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">NotReady</text>
   <text x="417.5" y="233" text-anchor="middle" style="font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #444444;">live: 200 (not restarted)</text>
   <text x="417.5" y="247" text-anchor="middle" style="font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #444444;">ready: NOT_SERVING</text>
-  <rect x="600" y="95" width="150" height="64" rx="6" ry="6" fill="#ecdfd8" stroke="#b86742" stroke-width="1.5"/>
+  <rect x="600" y="95" width="150" height="64" rx="6" ry="6" fill="#faf0e6" stroke="#a06030" stroke-width="1.5"/>
   <text x="675" y="115" text-anchor="middle" style="font: 700 14px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Draining</text>
   <text x="675" y="133" text-anchor="middle" style="font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #444444;">drain in-flight</text>
   <rect x="790" y="95" width="110" height="64" rx="6" ry="6" fill="#fdfbf7" stroke="#c0392b" stroke-width="2.0"/>

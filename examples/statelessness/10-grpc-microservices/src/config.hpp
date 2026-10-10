@@ -1,7 +1,7 @@
 // config.hpp — env-time configuration parsed once in main() (Doc 06).
 //
 // The doc's Config carries Redis, OTLP, and jemalloc fields too; this
-// buildable capstone keeps the fields the proven stack actually uses
+// buildable end-to-end example keeps the fields the proven stack actually uses
 // (Postgres via libpq, the tax upstream, deadline, pool sizes) and notes
 // the rest in the README. The discipline is the point: parse env ONCE,
 // here, into an immutable struct; pass it by const reference; no getenv

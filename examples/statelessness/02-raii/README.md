@@ -92,7 +92,7 @@ CI verification:
 └── demo.sh                  the driver
 ```
 
-## What this example deliberately leaves out
+## What this example leaves out
 
 - **Observability.** The lifecycle is visible in plain stdout; no LGTM
   stack. In production the `span_` would be an OpenTelemetry span.

@@ -1,4 +1,4 @@
-// pricing_client.cpp — a small client to drive the capstone from demo.sh.
+// pricing_client.cpp — a small client to drive the end-to-end example from demo.sh.
 //
 //   pricing-client <addr> <idempotency_key> <customer_id> <product:qty>...
 //
