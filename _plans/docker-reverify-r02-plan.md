@@ -1,7 +1,19 @@
-# Docker re-verification r02 — plan & progress
+# Docker re-verification r02 — plan & progress — ✅ COMPLETE (all phases validated)
 
 Branch: `verify/docker-reverify-r02`. Relay: Opus plan → Sonnet execute → Opus validate.
-Three workstreams run as a pipeline (file collisions in `_docs`/READMEs): **A → B → C**.
+Four workstreams run as a pipeline (file collisions in `_docs`/READMEs): **A → B → D → C**, then final aggregator + validate.
+
+## FINAL STATUS — GO, verification complete (NOT pushed; awaiting user push decision)
+- **A** Docker re-verify 10/10 CONFIRMED PASS (Opus-validated). `_config.yml` Podman→Docker attribution flipped.
+- **B** voice pass: 34→18 ban-tier (18 justified keeps: code-file comments + single-use "deliberately" with reasons). "capstone" purged from all site content.
+- **D** 3 new CI scripts (09/10/11) written + run (true exit 0); 2 real bugs fixed (field() \b word-boundary; 11 cpu assertion vs real sched_getaffinity fallback). Opus-validated at source level, both deviations confirmed non-vacuous.
+- **C** new `diagrams/08-deadline-budget-flow.{svg,excalidraw}` (was a broken placeholder in 2 docs); 10-grpc diagram "capstone"→"end-to-end example". Palette matches the bespoke set. Opus-validated (parse + palette + include resolution).
+- **Final aggregator** `scripts/test-all-stateless-demos.sh`: all 10 PASS, exit 0 (now discovers all 10 incl. 09/10/11). The 2 "FAIL" log matches are demo-08 expected-failure narration (EROFS/no-tmpfs traps).
+
+### Non-blocking items flagged for user's eye
+1. 14 "capstone" survivors are ALL code-file comments in `examples/statelessness/10-grpc-microservices/` (.cpp/.hpp/CMakeLists/Containerfile/compose.yml/conanfile.py/.proto/demo.sh). Optional code-comment sweep offered.
+2. `diagrams/statelessness/09-probe-states-shutdown.svg` uses 2 off-core-palette amber-ish colors (single use each) — minor set-uniformity inconsistency, not correctness.
+3. New 08 SVG uses `font-family=` attr vs the set's `font:` shorthand — cosmetic, same families, no visual diff.
 
 ## Workstream A — Docker re-verification of all 10 demos — ✅ DONE (10/10 CONFIRMED PASS, Opus-validated)
 
