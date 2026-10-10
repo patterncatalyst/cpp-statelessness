@@ -13,7 +13,7 @@ gate) assert on specific transcript markers.
 | # | Demo | Driver | Status |
 |---|------|--------|--------|
 | 1 | 07-outbox-pattern (never host-built) | scripts/test-stateless-demo-07-outbox-pattern.sh | PASS — reached final log_ok line, no exit 1 hit (set -euo pipefail) |
-| 2 | 09-health-checks | examples/.../09-health-checks/demo.sh (grep) | pending |
+| 2 | 09-health-checks | examples/.../09-health-checks/demo.sh (grep) | PASS — liveness 200 throughout, readiness NOT_SERVING↔SERVING on SIGUSR1x2, ordered shutdown exit 0 |
 | 3 | 10-grpc-microservices | examples/.../10-grpc-microservices/demo.sh (grep) | pending |
 | 4 | 11-build-tooling | examples/.../11-build-tooling/demo.sh (grep); --clean after | pending |
 | 5 | 02-raii | scripts/test-stateless-demo-02-raii.sh | pending |
