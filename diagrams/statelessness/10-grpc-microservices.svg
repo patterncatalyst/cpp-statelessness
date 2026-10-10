@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 485" role="img"
-     aria-label="gRPC microservices capstone: a complete order-pricing service composing process-scoped state (tracer, channel, pool), request-scoped RequestContext, and external authoritative state (Postgres, TaxService, Outbox)">
+     aria-label="gRPC end-to-end example: a complete order-pricing service composing process-scoped state (tracer, channel, pool), request-scoped RequestContext, and external authoritative state (Postgres, TaxService, Outbox)">
   <defs>
     <style><![CDATA[
       .bg       { fill: #fdfbf7; }
@@ -63,7 +63,7 @@
   <rect class="bg" width="920" height="485"/>
   <rect width="920" height="485" fill="url(#grid)"/>
 
-  <text x="460" y="34" text-anchor="middle" class="ttl">gRPC capstone: every pattern, one service</text>
+  <text x="460" y="34" text-anchor="middle" class="ttl">gRPC end-to-end example: every pattern, one service</text>
   <text x="460" y="54" text-anchor="middle" class="cap">main() wires process-scope · RequestContext owns request-scope · external state at the edges</text>
 
   <!-- Process box -->
