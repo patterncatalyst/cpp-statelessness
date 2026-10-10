@@ -3,7 +3,11 @@
 Branch: `verify/docker-reverify-r02`. Relay: Opus plan → Sonnet execute → Opus validate.
 Three workstreams run as a pipeline (file collisions in `_docs`/READMEs): **A → B → C**.
 
-## Workstream A — Docker re-verification of all 10 demos
+## Workstream A — Docker re-verification of all 10 demos — ✅ DONE (10/10 CONFIRMED PASS, Opus-validated)
+
+Validated GO. Caveats (non-blocking): 07-outbox exit code not captured but full-transcript failure scan clean + ran past `verified`; 03-pmr fallback branch provably did not fire. `_config.yml` attribution flipped. 11 checkpoint commits.
+Doc-drift found (deferred to B): `_examples/statelessness-10-grpc-microservices.md` has a dangling `CI verification:` ref to a non-existent `scripts/test-stateless-demo-10-grpc-microservices.sh`; demos 09 and 11 lack both a CI script and any CI-verification line.
+
 
 Sequential, highest-risk-first (fixed host port 50051 reused; shared `~/.conan2` cache).
 Transcripts → `.verify-transcripts/<demo>.log` (gitignored, ephemeral). Checkpoint commit per demo.
