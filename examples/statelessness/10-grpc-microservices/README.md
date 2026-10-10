@@ -1,4 +1,4 @@
-# statelessness/10-grpc-microservices — the gRPC capstone
+# statelessness/10-grpc-microservices — the gRPC end-to-end example
 
 Compendium reference:
 [Doc 10 — Microservices with gRPC and C++](../../../_docs/10-grpc-microservices.md)
@@ -53,7 +53,7 @@ RPCs, then reverse-order teardown, exit 0 — the signal-safe sequence from
 ## Divergences from Doc 10 (to stay on the verified stack)
 
 The doc's literal feature set pulls in several dependencies this tutorial
-has either rejected or never built. To keep the *capstone* buildable and
+has either rejected or never built. To keep this example buildable and
 green, each is represented structurally rather than wired, and called out
 here — the architecture and composition are identical, only the realized
 backends differ:
@@ -64,7 +64,7 @@ backends differ:
 - **No Redis.** The doc caches prices in Redis with a PG fallback; here the
   price lookup goes straight to PostgreSQL. The cache-aside *seam* is marked
   in `fetch_price` where a Redis GET would slot in.
-- **No OpenTelemetry.** Every example in this tutorial deliberately stays on
+- **No OpenTelemetry.** Every example in this tutorial stays on
   the verified gRPC trio. The `RequestContext`'s span/scope is a documented
   seam (see [`request_context.hpp`](src/request_context.hpp)), not a built
   dependency. The RAII shape is identical; adding a real `TracerProvider` is
@@ -104,14 +104,14 @@ is far faster. The demo drives `PriceOrder` with the in-image
 
 | Path | Role |
 |---|---|
-| [`proto/pricing.proto`](proto/pricing.proto) | the capstone API (`pricing.v1.Pricing`) |
+| [`proto/pricing.proto`](proto/pricing.proto) | the pricing API (`pricing.v1.Pricing`) |
 | [`proto/tax.proto`](proto/tax.proto) | the outbound upstream (`tax.v1.TaxService`) |
 | [`proto/health.proto`](proto/health.proto) | standard `grpc.health.v1` (for the probe) |
 | [`src/config.hpp`](src/config.hpp) | env-time `Config` (Doc 06) |
 | [`src/channel_cache.hpp`](src/channel_cache.hpp) | process-scoped gRPC channel cache (Doc 04) |
 | [`src/request_context.hpp`](src/request_context.hpp) | per-request RAII + PMR arena (Doc 02/03) |
 | [`src/pg_pool.hpp`](src/pg_pool.hpp) | 07's verified libpq pool (Doc 07) |
-| [`src/pricing_svc.cpp`](src/pricing_svc.cpp) | the capstone: handler, helpers, `main()` |
+| [`src/pricing_svc.cpp`](src/pricing_svc.cpp) | the pricing service: handler, helpers, `main()` |
 | [`src/tax_svc.cpp`](src/tax_svc.cpp) | the outbound tax upstream |
 | [`src/pricing_client.cpp`](src/pricing_client.cpp) | drives `PriceOrder` for the demo |
 | [`src/health_probe.cpp`](src/health_probe.cpp) | our minimal `grpc_health_probe` |

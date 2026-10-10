@@ -26,7 +26,7 @@ The toolchain landscape moves quickly. C++23 features that were partial a year a
 > `./demo.sh` runs the tests, then sweeps `--cpus` / `--memory` so you can
 > watch `cpu_limit_cores()` track the cgroup while `hardware_concurrency()`
 > does not. The third helper, `otel_propagator`, needs opentelemetry-cpp,
-> which this tutorial deliberately doesn't build, so it stays reference-only
+> which this tutorial doesn't build, so it stays reference-only
 > here. The Conan profiles, library inventory, toolchain matrix, and
 > Containerfile patterns in the rest of this document are the prose
 > reference they accompany.

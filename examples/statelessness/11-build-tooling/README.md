@@ -13,7 +13,7 @@ libraries, unit-tested with GoogleTest, and exercised by a binary you run
 under different cgroup caps to watch the readings track them.
 
 (The third helper, `otel_propagator`, needs opentelemetry-cpp, which this
-tutorial deliberately doesn't pull in — see the note below. The reference
+tutorial doesn't pull in — see the note below. The reference
 material from Doc 11 lives on the compendium page; this example is the
 runnable slice of it.)
 

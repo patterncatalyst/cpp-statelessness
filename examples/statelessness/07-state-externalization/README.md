@@ -107,7 +107,7 @@ PostgreSQL.
 
 ## Production note
 
-For real deployments, Doc 07 recommends PgBouncer (or pgcat) in front of
+In production, Doc 07 recommends PgBouncer (or pgcat) in front of
 the database *and* a small in-process pool inside the service: the
 external pooler handles database-side connection limits and
 transaction-mode pooling; the in-process pool gives you RAII checkout,

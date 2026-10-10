@@ -46,7 +46,7 @@ builds its own minimal one from [`proto/health.proto`](proto/health.proto)
 — no build-time network dependency, and the `Check` RPC is visible
 in the source instead of hidden in a prebuilt tool.
 
-## Two corrections worth flagging vs the compendium prose
+## Two corrections to the compendium prose
 
 The doc is a faithful guide, but writing the runnable version surfaced two
 details:

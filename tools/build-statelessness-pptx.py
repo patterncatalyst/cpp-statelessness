@@ -65,7 +65,7 @@ def build_title(prs, total):
                 size=F.TITLE_HUGE, color=C.TEXT_WHITE, bold=True, font=FontFam.HEADER)
     bp.add_text(slide, Inches(1.0), Inches(4.5), Inches(11.3), Inches(0.5),
                 "Request / process / deploy-time scope  •  RAII  •  PMR  •  pools  "
-                "•  health & shutdown  •  the gRPC capstone",
+                "•  health & shutdown  •  the gRPC end-to-end example",
                 size=F.BODY, color=C.TEXT_LIGHT, font=FontFam.BODY)
     bp.add_text(slide, Inches(1.0), Inches(5.2), Inches(11.3), Inches(0.4),
                 "Companion deck to \u201cOptimizing Modern C++ with Containers\u201d  "
@@ -133,8 +133,8 @@ def build_agenda(prs, total, sections):
         "through 8 cover the operational concerns — process-scoped ownership, "
         "threading, 12-factor, state externalization, the ephemeral "
         "filesystem. Documents 9 through 11 land it — health checks and "
-        "shutdown, the gRPC capstone that composes everything, and the build "
-        "tooling appendix with the vendored helpers.\n\n"
+        "shutdown, the gRPC end-to-end example that composes everything, "
+        "and the build tooling appendix with the vendored helpers.\n\n"
         "Each section ends or pauses on a demo cue where the pattern has a "
         "runnable companion.")
 
@@ -152,7 +152,7 @@ def build_closing(prs, total):
         dict(text="Request scope \u2192 RAII + PMR. Process scope \u2192 owned in main(). "
                   "Authoritative state \u2192 externalized.", size=Pt(18),
              color=C.TEXT_LIGHT, font=FontFam.BODY, space_before=Pt(10)),
-        dict(text="It all composes in the capstone \u2014 and examples 02\u201311 are "
+        dict(text="It all composes in the end-to-end example \u2014 and examples 02\u201311 are "
                   "host-verified on Fedora 44.", size=Pt(18), color=C.ACCENT_CYAN,
              font=FontFam.BODY, space_before=Pt(10)),
     ])
@@ -162,13 +162,13 @@ def build_closing(prs, total):
     bp.add_text(slide, Inches(1.0), Inches(6.4), Inches(11.3), Inches(0.4),
                 REPO_URL, size=F.CAPTION, color=C.TEXT_MUTED, font=FontFam.CODE)
     bp.set_notes(slide,
-        "To close: statelessness isn't a checkbox you tick in code — it's a "
-        "posture the orchestrator can rely on, and the C++ techniques in this "
+        "To close: statelessness is a posture the orchestrator can rely on, "
+        "not a checkbox ticked in code, and the C++ techniques in this "
         "compendium are how a C++ service earns it. Request scope through RAII "
         "and PMR, process scope owned explicitly in main(), authoritative "
         "state externalized so any replica can die without loss.\n\n"
-        "And none of it is theory: every pattern has a runnable demo, and the "
-        "whole arc from RAII to the gRPC capstone is host-verified. Clone the "
+        "Every pattern has a runnable demo, and the whole arc from RAII to "
+        "the gRPC end-to-end example is host-verified. Clone the "
         "repo, run the demos, read the long-form compendium. Thank you.")
 
 
