@@ -59,5 +59,15 @@ Review 13 pairs for consistency + label voice. Fixes:
 2. `diagrams/statelessness/10-grpc-microservices.svg` title "gRPC capstone" → "gRPC end-to-end example"
    (regenerate SVG + .excalidraw), matching the doc caption.
 
+## Workstream D — write the 3 missing CI scripts (user-approved; runs after B, before/with C)
+Demos 09/10/11 passed via demo.sh but have no `scripts/test-stateless-demo-{09,10,11}-*.sh`.
+Author them modeled on the existing 7 (non-interactive, `set -euo pipefail`, source `_helpers.sh`,
+exit 1 on failed acceptance marker, final `log_ok ... verified`), so the aggregator covers all 10.
+Then RUN each to confirm exit 0 (warm conan cache). Fix docs: correct the dangling
+`CI verification:` ref in `_examples/statelessness-10-grpc-microservices.md`; add CI-verification
+lines to the 09/11 examples. NOTE: these doc edits touch the same `_examples` files as B → sequence after B.
+
+## Pipeline order: A ✅ → B (voice) → D (CI scripts) → C (diagrams) → final aggregator run over all 10 → validate
+
 ## Push
 Do NOT push. Final push only on explicit user permission.
