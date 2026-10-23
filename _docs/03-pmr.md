@@ -7,13 +7,27 @@ sectionid: docs
 part: request-scope
 ---
 
-# 03 — PMR's `monotonic_buffer_resource` as Architectural Statelessness
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Explain how `std::pmr::monotonic_buffer_resource` turns "request brings its own memory, all releases together" into enforceable C++ structure.
+- Build a request-scoped arena, including the layered monotonic-plus-pool recipe for handlers that insert and erase repeatedly.
+- Choose the right `std::` or `std::pmr::` container type (`vector`, `flat_map`, `unordered_map`, `array`/`span`) for a given handler-scoped workload.
+- Recognize and avoid the arena lifetime trap: letting a view into arena memory escape into process-scoped or external state.
+- Decide when to reach for the gRPC per-RPC allocator hook versus handler-internal PMR, and justify the choice with a profile.
+
+## Why this matters
+
+Per-request allocation that goes straight to the global heap puts every handler in competition for the same malloc arena lock, the same free-list traversal, and the same page-fault risk. Under load, that contention shows up as tail-latency spikes that are hard to attribute to any one line of code, because the symptom (a slow P99) is several steps removed from the cause (heap allocator contention). A service that cannot bound its per-request memory traffic cannot reason about its own tail latency.
+
+PMR gives request-scoped memory a concrete, enforceable boundary: allocate from an arena sized for the request, release it all at once when the request ends. Skipping this does not just cost raw allocation speed; it reintroduces the exact per-request state-leakage risk that [Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }}) is built to prevent, because an allocator that doesn't know about request boundaries has no structural reason to keep one request's memory from outliving its request.
 
 ## Thesis
 
-[Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }}) established the discipline: bundle per-request state into a `RequestContext` RAII type, destroy at scope exit, no manual cleanup. The arena member of that context — a `std::pmr::monotonic_buffer_resource` backed by an inline buffer — is the in-language realization of "request brings its own memory, all releases together, no allocation crosses the boundary." Construct an arena at request entry, allocate everything from it via `std::pmr::polymorphic_allocator`, destroy at request exit. The arena *is* the statelessness boundary, mechanized in the type system and enforced by the C++ destruction model.
+[Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }}) established the discipline: bundle per-request state into a `RequestContext` RAII type, destroy at scope exit, no manual cleanup. The arena member of that context, a `std::pmr::monotonic_buffer_resource` backed by an inline buffer, is the in-language realization of "request brings its own memory, all releases together, no allocation crosses the boundary." Construct an arena at request entry, allocate everything from it via `std::pmr::polymorphic_allocator`, destroy at request exit. The arena *is* the statelessness boundary, mechanized in the type system and enforced by the C++ destruction model.
 
-This document covers PMR for service handlers: how `monotonic_buffer_resource` works, the layered-resource pattern that's become the canonical recipe, how the `std::pmr::*` container family integrates, the choice of `std::` container types over PMR, and the lifetime traps that catch people the first few times. The performance angle from [Doc 02]({{ '/docs/02-raii/' | relative_url }}) — the asymmetry between O(N) per-entry destruction and O(1) arena release — gets its concrete realization here.
+This document covers PMR for service handlers: how `monotonic_buffer_resource` works, the layered-resource pattern that's become the canonical recipe, how the `std::pmr::*` container family integrates, the choice of `std::` container types over PMR, and the lifetime traps that catch people the first few times. The performance angle from [Doc 02]({{ '/docs/02-raii/' | relative_url }}), the asymmetry between O(N) per-entry destruction and O(1) arena release, gets its concrete realization here.
 
 {% include excalidraw.html name="statelessness/03-pmr" caption="PMR monotonic_buffer_resource: bump-pointer per request, single bulk free at scope-end." %}
 
@@ -22,17 +36,17 @@ This document covers PMR for service handlers: how `monotonic_buffer_resource` w
 > It's a gRPC service with an `arena` mode (per-request scratch from a
 > layered monotonic + pool arena) and a `bench` mode (the
 > release-cost comparison), plus a standalone AddressSanitizer binary
-> that demonstrates the lifetime trap below — ASan catches the dangling
+> that demonstrates the lifetime trap below. ASan catches the dangling
 > arena view as a `heap-use-after-free`. Clone the repo, `cd` in, and
 > `./demo.sh`.
 
 ## Why PMR
 
-The Polymorphic Memory Resources facility, introduced in C++17 in `<memory_resource>`, separates two things that pre-PMR custom allocators conflated: *which* memory resource to use, and *how* to use it. A `std::pmr::memory_resource` is an abstract base with a single allocate/deallocate pair. A `std::pmr::polymorphic_allocator<T>` wraps a pointer to a memory resource and presents the standard allocator interface. The same vector type — `std::pmr::vector<int>` — can be backed by a stack-allocated arena, a heap-backed pool, a third-party allocator, or even a memory-mapped region, simply by handing it a different resource pointer.
+The Polymorphic Memory Resources facility, introduced in C++17 in `<memory_resource>`, separates two things that pre-PMR custom allocators conflated: *which* memory resource to use, and *how* to use it. A `std::pmr::memory_resource` is an abstract base with a single allocate/deallocate pair. A `std::pmr::polymorphic_allocator<T>` wraps a pointer to a memory resource and presents the standard allocator interface. The same vector type, `std::pmr::vector<int>`, can be backed by a stack-allocated arena, a heap-backed pool, a third-party allocator, or even a memory-mapped region, simply by handing it a different resource pointer.
 
 The mechanical advantage over pre-PMR custom allocators is that allocator type does not appear in the container's type. `std::vector<int, MyArenaAllocator>` and `std::vector<int, MyPoolAllocator>` are different types and don't interoperate. `std::pmr::vector<int>` is one type regardless of which resource backs a particular instance. This makes PMR-based code composable: a function that takes a `std::pmr::vector<int>&` accepts vectors backed by any resource the caller chose.
 
-> **Opinion.** PMR is one of the most undersold features of C++17. For a service codebase that wants per-request allocation discipline, the alternative — custom allocator templates threaded through every container type — is almost always worse. Reach for PMR first; reach for custom allocators only when you have a profile that says PMR's vtable overhead is the bottleneck.
+> **Opinion.** PMR is one of the most undersold features of C++17. For a service codebase that wants per-request allocation discipline, the alternative (custom allocator templates threaded through every container type) is almost always worse. Reach for PMR first; reach for custom allocators only when you have a profile that says PMR's vtable overhead is the bottleneck.
 
 The runtime cost of PMR is one virtual call per allocation through the `memory_resource` base. For arena-style use this is negligible; for high-frequency allocation of small objects in tight inner loops, it can be measurable, in which case the PMR-allocator can be re-wrapped as a concrete allocator type to elide the indirection. The compiler can devirtualize when the resource type is known statically, but only if the inlining context lets it see through the pointer.
 
@@ -42,7 +56,7 @@ The runtime cost of PMR is one virtual call per allocation through the `memory_r
 
 This shape gives three properties that matter to a handler.
 
-First, allocation is fast. A bump-pointer increment costs a handful of instructions, often inlined to nothing. Compared to a heap allocation — lock acquisition, free-list traversal, possible page fault, possible system call — the difference is one to two orders of magnitude.
+First, allocation is fast. A bump-pointer increment costs a handful of instructions, often inlined to nothing. Compared to a heap allocation (lock acquisition, free-list traversal, possible page fault, possible system call), the difference is one to two orders of magnitude.
 
 Second, deallocation is a no-op. `do_deallocate` does nothing. Per-allocation deallocation cost is zero. This is the underpinning of the O(1) destruction property: the destructor of a `pmr::vector` over a monotonic arena runs the value destructors but the per-element deallocate goes nowhere. For trivially destructible values, even the value destructors compile out and the entire teardown collapses to "decrement the bump pointer to where it was."
 
@@ -102,7 +116,7 @@ private:
 };
 ```
 
-The `RequestContext` from [Doc 02]({{ '/docs/02-raii/' | relative_url }}) already has this as a member; the standalone class above is for cases where the arena is wanted alone. Sizing the inline buffer to 64 KB is a reasonable starting point — large enough that most handlers stay heap-free, small enough that 1,000 in-flight requests fit in 64 MB. Tune from a profile.
+The `RequestContext` from [Doc 02]({{ '/docs/02-raii/' | relative_url }}) already has this as a member; the standalone class above is for cases where the arena is wanted alone. Sizing the inline buffer to 64 KB is a reasonable starting point: large enough that most handlers stay heap-free, small enough that 1,000 in-flight requests fit in 64 MB. Tune from a profile.
 
 A handler that uses it through the standard library:
 
@@ -144,13 +158,13 @@ grpc::ServerUnaryReactor* MyService::TokenizeAndCount(
 }
 ```
 
-Two things to notice. First, every container takes the resource pointer as a constructor argument. There is no global default — passing the resource is the trade for not having to template the container type on the allocator. Second, the boundary between arena-owned and gRPC-owned memory is explicit: the response protobuf message is owned by gRPC and its strings are heap-allocated by protobuf's own allocator. Copying out of the arena into the response is intentional, because the response outlives the arena.
+Two things to notice. First, every container takes the resource pointer as a constructor argument. There is no global default: passing the resource is the trade for not having to template the container type on the allocator. Second, the boundary between arena-owned and gRPC-owned memory is explicit: the response protobuf message is owned by gRPC and its strings are heap-allocated by protobuf's own allocator. Copying out of the arena into the response is intentional, because the response outlives the arena.
 
-> **Opinion.** Make the arena/protobuf boundary explicit in code review. The mistake is to hold an arena-allocated `std::pmr::string` reference inside a structure that outlives the arena — the response message, a process-scoped cache, a closure passed to an async continuation. The counterexample below shows the failure mode.
+> **Opinion.** Make the arena/protobuf boundary explicit in code review. The mistake is to hold an arena-allocated `std::pmr::string` reference inside a structure that outlives the arena: the response message, a process-scoped cache, a closure passed to an async continuation. The counterexample below shows the failure mode.
 
 ## Layered resources: monotonic + pool
 
-The single-resource pattern above is great for one-shot scratch — build it, use it, destroy it. For handlers that build and *modify* container contents (insertions, deletions, reallocations), a layered resource works better:
+The single-resource pattern above is great for one-shot scratch: build it, use it, destroy it. For handlers that build and *modify* container contents (insertions, deletions, reallocations), a layered resource works better:
 
 ```cpp
 class RequestArena {
@@ -177,9 +191,9 @@ private:
 
 The pool resource carves the monotonic slab into size-class freelists. Allocations under 512 bytes go through the pool's per-size-class freelist; allocations above the threshold pass through to the monotonic resource directly. Deallocations to the pool return the block to its freelist for reuse within the same request. Deallocations to the monotonic resource are still no-ops.
 
-The win is that handlers which repeatedly allocate and deallocate small objects of the same size — typical of `unordered_map` rebucketing, `vector` reallocations, push/pop on a `deque` — reuse memory within the arena rather than monotonically growing the underlying slab. The arena footprint stays bounded by the high-water mark of *concurrent* allocations rather than the total of all allocations.
+The win is that handlers which repeatedly allocate and deallocate small objects of the same size (typical of `unordered_map` rebucketing, `vector` reallocations, push/pop on a `deque`) reuse memory within the arena rather than monotonically growing the underlying slab. The arena footprint stays bounded by the high-water mark of *concurrent* allocations rather than the total of all allocations.
 
-Choose `unsynchronized_pool_resource` for single-threaded handler use; the request handler runs on one thread at a time. Use `synchronized_pool_resource` only if the arena is shared across threads. Sharing a request arena across threads is usually a design smell — if a handler dispatches work to another thread, that work either copies what it needs out, or gets its own arena.
+Choose `unsynchronized_pool_resource` for single-threaded handler use; the request handler runs on one thread at a time. Use `synchronized_pool_resource` only if the arena is shared across threads. Sharing a request arena across threads is usually a design smell: if a handler dispatches work to another thread, that work either copies what it needs out, or gets its own arena.
 
 ## Choice of `std::` containers over PMR
 
@@ -187,7 +201,7 @@ PMR is the gateway to making `std::` container choices that actually serve a han
 
 `std::pmr::vector<T>` is the workhorse. Bump-allocated on `push_back` until the arena is exhausted; geometric reallocation moves still happen, but the freed blocks stay in the arena (no-op deallocate). Call `reserve()` to the expected size on construction to avoid the reallocations entirely. The reallocation cost in an arena is small but not zero, and the reallocated old buffer is dead weight in the arena until it dies.
 
-`std::pmr::string` keeps the small-string optimization. Strings up to ~15 bytes (libstdc++) or ~22 bytes (libc++) live in the string's own bytes and bypass the resource entirely. Only longer strings hit the arena. For handlers that copy many short identifiers — user IDs, type tags, short keys — SBO does more work than the arena.
+`std::pmr::string` keeps the small-string optimization. Strings up to ~15 bytes (libstdc++) or ~22 bytes (libc++) live in the string's own bytes and bypass the resource entirely. Only longer strings hit the arena. For handlers that copy many short identifiers (user IDs, type tags, short keys), SBO does more work than the arena.
 
 `std::pmr::unordered_map<K, V>` is where the destruction-asymmetry payoff is largest. Each node allocates from the arena; lookup and insert costs are unchanged from the default-allocator version. Destruction of a 100,000-entry map collapses from 100,000 destructor calls with 100,000 deallocations (default `unordered_map`) to 100,000 destructor calls with 100,000 no-op deallocations plus one buffer release (PMR). For trivially destructible value types, even the destructor calls compile out and teardown becomes a single bump-pointer reset.
 
@@ -245,7 +259,7 @@ grpc::ServerUnaryReactor* MyService::Cache(
 
 The compiler is happy. AddressSanitizer catches this immediately if the memory has been overwritten; without ASan, the bug manifests as inconsistent cache reads under load. The mental rule: anything stored in process-scoped state must own its memory or have a documented lifetime at least as long as the process-scoped state. An arena-allocated string is owned by the arena; storing a view into it past the arena's death is a bug.
 
-The fix is either to copy out — allocate a regular `std::string` into the cache — or to design the cache around arena ownership (rarely worth it for cross-request state). [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }}) covers the externalized-cache pattern that sidesteps the problem entirely.
+The fix is either to copy out (allocate a regular `std::string` into the cache) or to design the cache around arena ownership (rarely worth it for cross-request state). [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }}) covers the externalized-cache pattern that sidesteps the problem entirely.
 
 ## Other pitfalls
 
@@ -253,11 +267,11 @@ A handful of other PMR gotchas worth knowing.
 
 Individual `deallocate` is a no-op on `monotonic_buffer_resource`. A `std::pmr::vector` that grows from size 1 to size 1024 reallocates its backing array ten times in geometric progression. All nine prior buffers remain in the arena until the arena dies. `reserve()` avoids this; without it, the arena grows faster than intuition suggests.
 
-Falling off the inline buffer into the upstream resource negates the heap-free property. A handler whose typical case fits in 64 KB but whose occasional case spikes to 1 MB will hit the upstream — for the bottom-only monotonic pattern, that's the global allocator. Size the inline buffer to comfortably cover the typical case, accept the occasional fallthrough, and instrument to detect when the fallthrough rate climbs.
+Falling off the inline buffer into the upstream resource negates the heap-free property. A handler whose typical case fits in 64 KB but whose occasional case spikes to 1 MB will hit the upstream; for the bottom-only monotonic pattern, that's the global allocator. Size the inline buffer to comfortably cover the typical case, accept the occasional fallthrough, and instrument to detect when the fallthrough rate climbs.
 
-Arena `release()` is callable on a `monotonic_buffer_resource` to reclaim all buffers without destroying the resource. This lets a single resource be reused across iterations of a loop — useful for batch processing but rarely for one-shot RPC handlers. If you find yourself reaching for `release()` mid-handler, the design probably wants two arenas.
+Arena `release()` is callable on a `monotonic_buffer_resource` to reclaim all buffers without destroying the resource. This lets a single resource be reused across iterations of a loop, useful for batch processing but rarely for one-shot RPC handlers. If you find yourself reaching for `release()` mid-handler, the design probably wants two arenas.
 
-`std::pmr::polymorphic_allocator` carries the resource pointer by raw pointer. The allocator does not own the resource. A copy of a PMR container shares the resource with the original — this is correct for the per-request pattern but surprising the first time. The implication is that copy-constructing a PMR vector copies elements into the source's arena, not a new one. Pass the destination arena explicitly when copying across arenas.
+`std::pmr::polymorphic_allocator` carries the resource pointer by raw pointer. The allocator does not own the resource. A copy of a PMR container shares the resource with the original; this is correct for the per-request pattern but surprising the first time. The implication is that copy-constructing a PMR vector copies elements into the source's arena, not a new one. Pass the destination arena explicitly when copying across arenas.
 
 ## gRPC integration: per-RPC allocators
 
@@ -265,13 +279,13 @@ gRPC's callback API includes a hook for per-method memory allocation. The genera
 
 This is the direct hook for per-RPC PMR. Implementing it well requires a per-method allocator that constructs a fresh arena per call and tears it down when the call finishes; the gRPC proposal `L67-cpp-callback-api.md` covers the interface in detail. [Doc 10 (gRPC end-to-end example)]({{ '/docs/10-grpc-microservices/' | relative_url }}) walks through wiring a per-RPC arena into a complete service.
 
-The lighter-touch approach — and the one this document leans on — is to leave the protobuf request/response objects on the default allocator and use the request arena only for handler-internal scratch. The overhead of letting protobuf allocate via the global heap is small compared to the wins from arena-allocating intermediate computations. Reach for the per-RPC allocator hook only when profiling shows protobuf allocation as a measurable fraction of handler time.
+The lighter-touch approach, and the one this document leans on, is to leave the protobuf request/response objects on the default allocator and use the request arena only for handler-internal scratch. The overhead of letting protobuf allocate via the global heap is small compared to the wins from arena-allocating intermediate computations. Reach for the per-RPC allocator hook only when profiling shows protobuf allocation as a measurable fraction of handler time.
 
 ## C++23: `std::pmr::stacktrace` and `std::pmr::flat_map`
 
 C++23 added two PMR-related types.
 
-`std::pmr::stacktrace` is an alias for `std::basic_stacktrace<std::pmr::polymorphic_allocator<std::stacktrace_entry>>`. Captured in a handler with the request arena as the resource, a stacktrace at the point of an error is arena-allocated — no extra cleanup, no extra heap traffic. For services that capture stacks for telemetry (sending them to Tempo or attaching as span attributes), this keeps the diagnostic path arena-local:
+`std::pmr::stacktrace` is an alias for `std::basic_stacktrace<std::pmr::polymorphic_allocator<std::stacktrace_entry>>`. Captured in a handler with the request arena as the resource, a stacktrace at the point of an error is arena-allocated: no extra cleanup, no extra heap traffic. For services that capture stacks for telemetry (sending them to Tempo or attaching as span attributes), this keeps the diagnostic path arena-local:
 
 ```cpp
 void log_error(const RequestContext& rc, std::string_view what) {
@@ -286,9 +300,9 @@ GCC 14 and Clang 18 with libc++ support both; [Doc 11 (build tooling)]({{ '/docs
 
 ## A note on benchmarks
 
-The cppreference example for `monotonic_buffer_resource` shows about a 2–3× speedup on a 200,000-element `std::list<int>` build compared to default `std::list<int>`. That's a real number but it's specific to that workload — high-churn small-object allocation in a single-threaded build phase. Real handlers see anywhere from no improvement (when allocation isn't the bottleneck) to 5–10× on P99 (when default-allocator lock contention is the dominant tail-latency source).
+The cppreference example for `monotonic_buffer_resource` shows about a 2–3× speedup on a 200,000-element `std::list<int>` build compared to default `std::list<int>`. That's a real number but it's specific to that workload: high-churn small-object allocation in a single-threaded build phase. Real handlers see anywhere from no improvement (when allocation isn't the bottleneck) to 5–10× on P99 (when default-allocator lock contention is the dominant tail-latency source).
 
-The answer is: measure. PMR's biggest practical win is usually the predictability — tail-latency variance shrinks dramatically when per-request heap traffic is constrained to a bounded arena. Mean throughput improvements are smaller and more workload-dependent. The right reason to adopt PMR per-request is the architectural one (request-scope memory bound to request-scope lifetime), with the performance win as confirmation.
+The answer is: measure. PMR's biggest practical win is usually the predictability: tail-latency variance shrinks dramatically when per-request heap traffic is constrained to a bounded arena. Mean throughput improvements are smaller and more workload-dependent. The right reason to adopt PMR per-request is the architectural one (request-scope memory bound to request-scope lifetime), with the performance win as confirmation.
 
 ## Recommendation summary
 
@@ -302,13 +316,13 @@ Make the arena/external boundary explicit. Anything stored in process-scoped sta
 
 Profile before reaching for the gRPC per-RPC allocator hook. Handler-internal PMR is the high-leverage refactor; protobuf-level PMR is finer-grained tuning that's rarely the bottleneck.
 
-Adopt PMR for the architectural shape — request-scope memory tied to request-scope lifetime — and treat the performance numbers as confirmation rather than the primary motivation.
+Adopt PMR for the architectural shape (request-scope memory tied to request-scope lifetime) and treat the performance numbers as confirmation rather than the primary motivation.
 
 ## Cross-references
 
 [Doc 02]({{ '/docs/02-raii/' | relative_url }}) establishes the RAII discipline that the arena participates in, and the performance angle on construction and destruction that PMR concretely realizes.
 
-[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped memory — the PMR upstream resource, prepared-statement caches, connection pools — and how it interacts with OS container memory limits.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped memory (the PMR upstream resource, prepared-statement caches, connection pools) and how it interacts with OS container memory limits.
 
 [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers threading; the `unsynchronized_pool_resource` choice above assumes single-threaded handler use. Coroutines that hop threads across `co_await` need to be careful about which thread's arena they're operating on.
 
@@ -331,6 +345,6 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **"Building Low Latency Applications with C++".** The allocator chapter covers PMR alongside other patterns; useful background for the layered-resource discussion. The book leans more on custom allocators than PMR specifically, so read it for the constraints rather than the conclusions.
 
-**Yonts, *100 C++ Mistakes and How to Avoid Them*.** The cluster of mistakes around allocator type erasure, container template parameters, and lifetime confusion is directly relevant — particularly the entries on dangling references and on container/allocator mismatches.
+**Yonts, *100 C++ Mistakes and How to Avoid Them*.** The cluster of mistakes around allocator type erasure, container template parameters, and lifetime confusion is directly relevant, particularly the entries on dangling references and on container/allocator mismatches.
 
 **cppreference (`en.cppreference.com/w/cpp/memory/monotonic_buffer_resource`).** The canonical reference for the type's semantics and the canonical benchmark example. Worth reading once end-to-end before designing an arena.

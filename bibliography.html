@@ -26,11 +26,11 @@ permalink: /bibliography/
 <section class="section">
     <div class="container container-prose">
 
-<h2>Andrist &amp; Sehr — <em>C++ High Performance</em>, 2nd Edition</h2>
+<h2>Andrist &amp; Sehr: <em>C++ High Performance</em>, 2nd Edition</h2>
 
 <p>
 Björn Andrist and Viktor Sehr, Packt, 2020.
-Deep on language machinery, lighter on container context — which is
+Deep on language machinery, lighter on container context, which is
 exactly the gap the compendium fills.
 </p>
 
@@ -52,20 +52,20 @@ are particularly close to material the compendium builds on.
 allocator design before seeing it applied to a request arena.
 <strong>Alongside</strong> Doc 05 if you want the parallel-STL and
 thread-pool material in full, since the compendium only covers the
-container-specific slice of it. Either order works — the two answer
+container-specific slice of it. Either order works: the two answer
 adjacent questions.
 </p>
 
 <h3>Where the compendium draws on it</h3>
 
 <ul>
-<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR) — allocator design rationale, <code>monotonic_buffer_resource</code> mechanics</li>
-<li><a href="{{ '/docs/04-process-scoped-state/' | relative_url }}"><strong>Doc 04</strong></a> (Process-scoped state) — connection pools and prepared-statement caches as process-scoped infrastructure</li>
-<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading) — the parallel STL and thread-pool material underneath the CFS-quota discussion</li>
-<li><a href="{{ '/docs/11-build-tooling/' | relative_url }}"><strong>Doc 11</strong></a> (Build tooling) — the C++23 feature-support table and compiler-version requirements</li>
+<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR): allocator design rationale, <code>monotonic_buffer_resource</code> mechanics</li>
+<li><a href="{{ '/docs/04-process-scoped-state/' | relative_url }}"><strong>Doc 04</strong></a> (Process-scoped state): connection pools and prepared-statement caches as process-scoped infrastructure</li>
+<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading): the parallel STL and thread-pool material underneath the CFS-quota discussion</li>
+<li><a href="{{ '/docs/11-build-tooling/' | relative_url }}"><strong>Doc 11</strong></a> (Build tooling): the C++23 feature-support table and compiler-version requirements</li>
 </ul>
 
-<h2>Iglberger — <em>C++ Software Design</em></h2>
+<h2>Iglberger: <em>C++ Software Design</em></h2>
 
 <p>
 Klaus Iglberger, O'Reilly, 2022. Design principles and patterns for
@@ -76,8 +76,8 @@ survives at scale and what doesn't.
 <h3>What it covers</h3>
 
 <p>
-The classical design patterns rebuilt for modern C++ — Strategy,
-Visitor, Command, Bridge, Adapter — with hard-won opinions about
+The classical design patterns rebuilt for modern C++ (Strategy,
+Visitor, Command, Bridge, Adapter), with hard-won opinions about
 which ones are still worth carrying and which were artifacts of
 pre-template C++. The book's central argument is that loose coupling
 through value-based polymorphism (<code>std::variant</code>,
@@ -105,14 +105,14 @@ highlights:
 </p>
 
 <ul>
-<li><a href="{{ '/docs/00-index/' | relative_url }}"><strong>Doc 00</strong></a> (Index) — the request-scope / process-scope split loosely tracks Iglberger's separation-of-concerns argument</li>
-<li><a href="{{ '/docs/02-raii/' | relative_url }}"><strong>Doc 02</strong></a> (RAII) — the <code>RequestContext</code> pattern as a value-based alternative to inheritance-heavy designs</li>
-<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR) — the Bridge / PIMPL lifetime-ownership discussion that connects directly to allocator design</li>
-<li><a href="{{ '/docs/06-twelve-factor/' | relative_url }}"><strong>Doc 06</strong></a> (Twelve-factor) — the Meyers-singleton critique and the dependency-injection alternative</li>
-<li><a href="{{ '/docs/09-health-checks/' | relative_url }}"><strong>Doc 09</strong></a> (Health checks) — <code>HealthCheckServiceInterface</code> as the kind of clean seam Iglberger argues for</li>
+<li><a href="{{ '/docs/00-index/' | relative_url }}"><strong>Doc 00</strong></a> (Index): the request-scope / process-scope split loosely tracks Iglberger's separation-of-concerns argument</li>
+<li><a href="{{ '/docs/02-raii/' | relative_url }}"><strong>Doc 02</strong></a> (RAII): the <code>RequestContext</code> pattern as a value-based alternative to inheritance-heavy designs</li>
+<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR): the Bridge / PIMPL lifetime-ownership discussion that connects directly to allocator design</li>
+<li><a href="{{ '/docs/06-twelve-factor/' | relative_url }}"><strong>Doc 06</strong></a> (Twelve-factor): the Meyers-singleton critique and the dependency-injection alternative</li>
+<li><a href="{{ '/docs/09-health-checks/' | relative_url }}"><strong>Doc 09</strong></a> (Health checks): <code>HealthCheckServiceInterface</code> as the kind of clean seam Iglberger argues for</li>
 </ul>
 
-<h2>Enberg — <em>Latency: Reduce delay in software systems</em></h2>
+<h2>Enberg: <em>Latency: Reduce delay in software systems</em></h2>
 
 <p>
 Pekka Enberg, Manning, 2024.
@@ -123,7 +123,7 @@ problem and walks through the techniques.
 <h3>What it covers</h3>
 
 <p>
-What latency actually is and where it accumulates — syscalls,
+What latency actually is and where it accumulates: syscalls,
 context switches, cache misses, network hops, lock contention.
 Detailed treatment of the alternatives to traditional blocking I/O
 (<code>io_uring</code>, kernel bypass, busy-spin vs futex), what
@@ -148,19 +148,19 @@ under load.
 <h3>Where the compendium draws on it</h3>
 
 <ul>
-<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR) — the allocator-tax thesis that PMR's win is measured against</li>
-<li><a href="{{ '/docs/04-process-scoped-state/' | relative_url }}"><strong>Doc 04</strong></a> (Process-scoped state) — the budget framing for CPU and memory limits</li>
-<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading) — CFS throttling, tail latency, and the syscall-cost model behind the <code>io_uring</code> motivation</li>
-<li><a href="{{ '/docs/07-state-externalization/' | relative_url }}"><strong>Doc 07</strong></a> (State externalization) — deadline propagation and retry-with-backoff vs fail-fast</li>
+<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR): the allocator-tax thesis that PMR's win is measured against</li>
+<li><a href="{{ '/docs/04-process-scoped-state/' | relative_url }}"><strong>Doc 04</strong></a> (Process-scoped state): the budget framing for CPU and memory limits</li>
+<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading): CFS throttling, tail latency, and the syscall-cost model behind the <code>io_uring</code> motivation</li>
+<li><a href="{{ '/docs/07-state-externalization/' | relative_url }}"><strong>Doc 07</strong></a> (State externalization): deadline propagation and retry-with-backoff vs fail-fast</li>
 </ul>
 
-<h2>Ghosh — <em>Building Low Latency Applications with C++</em></h2>
+<h2>Ghosh: <em>Building Low Latency Applications with C++</em></h2>
 
 <p>
 Sourav Ghosh, Packt, 2023.
 The full worked example. Where the other three books cover individual
 techniques, Ghosh builds an entire low-latency trading ecosystem
-from scratch in modern C++ — order book, matching engine, market
+from scratch in modern C++: order book, matching engine, market
 data feed, network layer, the lot.
 </p>
 
@@ -172,7 +172,7 @@ the compendium covers in isolation composed into one running system.
 Lock-free queues for the matching engine, custom memory pools for
 per-message allocation, busy-spin vs futex for the producer-consumer
 boundary, NUMA-aware thread placement, kernel-bypass networking with
-solarflare/onload — all in one body of code. The book is also a
+solarflare/onload, all in one body of code. The book is also a
 case study in the discipline of latency-sensitive C++ design:
 nothing dynamic on the hot path, no exceptions in the matcher, all
 allocations pre-sized at startup.
@@ -183,7 +183,7 @@ allocations pre-sized at startup.
 <p>
 <strong>After</strong> the compendium if you want to see the patterns at
 full scale. <strong>Before</strong> if you want a worked example to compare
-the compendium's design choices against — Ghosh's choices are a good
+the compendium's design choices against: Ghosh's choices are a good
 anchor for &ldquo;wait, why doesn't the compendium do it that way?&rdquo;
 questions.
 </p>
@@ -191,9 +191,9 @@ questions.
 <h3>Where the compendium draws on it</h3>
 
 <ul>
-<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR) — pre-allocated pools and the &ldquo;no allocation on hot path&rdquo; discipline</li>
-<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading) — NUMA-aware design and the busy-spin vs futex trade-off</li>
-<li><a href="{{ '/docs/08-ephemeral-filesystem/' | relative_url }}"><strong>Doc 08</strong></a> (Ephemeral filesystem) — persistent-state-at-rest patterns for a long-lived process's on-disk footprint</li>
+<li><a href="{{ '/docs/03-pmr/' | relative_url }}"><strong>Doc 03</strong></a> (PMR): pre-allocated pools and the &ldquo;no allocation on hot path&rdquo; discipline</li>
+<li><a href="{{ '/docs/05-threading/' | relative_url }}"><strong>Doc 05</strong></a> (Threading): NUMA-aware design and the busy-spin vs futex trade-off</li>
+<li><a href="{{ '/docs/08-ephemeral-filesystem/' | relative_url }}"><strong>Doc 08</strong></a> (Ephemeral filesystem): persistent-state-at-rest patterns for a long-lived process's on-disk footprint</li>
 </ul>
 
 <h2>Cross-reference matrix</h2>
@@ -231,7 +231,7 @@ that book directly there.
 </tbody>
 </table>
 
-<h2>A few more — contributing references</h2>
+<h2>A few more: contributing references</h2>
 
 <p>
 Three more books the compendium cites, in a lighter rotation than
@@ -241,7 +241,7 @@ the four above:
 <p>
 <strong>Yonts, <em>100 C++ Mistakes and How to Avoid Them</em></strong>
 (Manning, 2024). A pattern-language treatment of the specific mistakes
-that show up over and over in production C++ — allocator type-erasure
+that show up over and over in production C++: allocator type-erasure
 traps, container/allocator mismatches, dangling references across
 ownership boundaries, lifetime confusion in the presence of exceptions.
 The cluster of mistakes that PMR in particular makes easy to commit.
@@ -251,7 +251,7 @@ Useful as a code-review checklist. Cited in
 
 <p>
 <strong>Geewax, <em>API Design Patterns</em></strong> (Manning, 2021).
-Idempotency, standard methods, error handling, long-running operations —
+Idempotency, standard methods, error handling, long-running operations:
 the cross-cutting API concerns this compendium operationalizes in C++.
 Cited in <a href="{{ '/docs/02-raii/' | relative_url }}">Doc 02</a>,
 04, 07, 09, 10.
@@ -267,8 +267,8 @@ Cited in <a href="{{ '/docs/02-raii/' | relative_url }}">Doc 02</a>,
 
 <p>
 Per the project's editorial constraint: every citation in the
-compendium is a <strong>pointer</strong> — &ldquo;see Iglberger ch. 4 for the
-full pattern&rdquo; — not a displacing summary. The books exist; if the
+compendium is a <strong>pointer</strong> (&ldquo;see Iglberger ch. 4 for the
+full pattern&rdquo;), not a displacing summary. The books exist; if the
 compendium replaced reading them, it would be doing the authors and
 the reader a disservice. This bibliography is meant to make the
 pointers easier to follow, not to compress the books into bullet

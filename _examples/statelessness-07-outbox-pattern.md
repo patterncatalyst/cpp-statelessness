@@ -1,10 +1,10 @@
 ---
-title: "Statelessness 07 — Outbox pattern"
-description: "The runnable companion to compendium Doc 07's Outbox pattern: an order and its event written in one PostgreSQL transaction, a relay that publishes the outbox to Kafka with FOR UPDATE SKIP LOCKED, and an idempotent consumer — at-least-once delivery plus idempotent apply gives an exactly-once effect."
+title: "Statelessness 07: Outbox pattern"
+description: "The runnable companion to compendium Doc 07's Outbox pattern: an order and its event written in one PostgreSQL transaction, a relay that publishes the outbox to Kafka with FOR UPDATE SKIP LOCKED, and an idempotent consumer; at-least-once delivery plus idempotent apply gives an exactly-once effect."
 order: 208
 card_eyebrow: "Compendium · <strong>Doc 07</strong>"
 card_title: "Outbox pattern"
-card_blurb: "Atomic DB write plus event emission: an order and its event written in one transaction, a relay that publishes the outbox to Kafka with FOR UPDATE SKIP LOCKED, and an idempotent consumer — at-least-once delivery plus idempotent apply gives an exactly-once effect."
+card_blurb: "Atomic DB write plus event emission: an order and its event written in one transaction, a relay that publishes the outbox to Kafka with FOR UPDATE SKIP LOCKED, and an idempotent consumer; at-least-once delivery plus idempotent apply gives an exactly-once effect."
 layout: example
 sectionid: examples
 permalink: /examples/statelessness-07-outbox-pattern/
@@ -12,10 +12,10 @@ demo_dir: statelessness/07-outbox-pattern
 github_path: examples/statelessness/07-outbox-pattern
 ---
 
-> The full source for this example lives in [`examples/statelessness/07-outbox-pattern/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/07-outbox-pattern) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/07-outbox-pattern/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/07-outbox-pattern): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 07 — State externalization]({{ '/docs/07-state-externalization/' | relative_url }})
+[Doc 07: State externalization]({{ '/docs/07-state-externalization/' | relative_url }})
 (the *Outbox pattern* section)
 
 A stateless service often has to update its database *and* announce the
@@ -35,13 +35,13 @@ divergence in distributed systems, and it's invisible until it bites:
   the two out of sync. Crash after the commit but before the publish, and the
   order exists but nothing downstream ever hears about it.
 - **The lost event has no trace.** Unlike a failed write that returns an
-  error, a lost publish often succeeds silently from the caller's view — the
+  error, a lost publish often succeeds silently from the caller's view: the
   order was created, the response was 200, and the missing event surfaces
   hours later as a reconciliation discrepancy nobody can explain.
 - **Exactly-once delivery doesn't exist; exactly-once *effect* does.** You
   can't guarantee a message is delivered exactly once over a network. What
   you *can* build is at-least-once delivery plus an idempotent consumer,
-  which produces the same end state as exactly-once — the achievable
+  which produces the same end state as exactly-once, the achievable
   guarantee.
 
 ## What this demo shows
@@ -51,13 +51,13 @@ writes both the order (deduped on `idempotency_key`, exactly as
 [07-state-externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }})
 does) and an `outbox` row. The outbox row is written only on a *fresh*
 insert, so a client retry never emits a duplicate event. Both rows commit
-together — there is no state where the order exists but the event was lost.
+together; there is no state where the order exists but the event was lost.
 
 **A relay with `FOR UPDATE SKIP LOCKED`.** A poller reads unpublished outbox
 rows, produces each to Kafka, flushes to confirm the broker acked, then marks
 them published and commits. `SKIP LOCKED` lets multiple relay replicas run
 without grabbing the same row. A crash between the Kafka ack and the commit
-re-publishes on the next pass — at-least-once delivery.
+re-publishes on the next pass (at-least-once delivery).
 
 **An idempotent consumer.** The consumer applies each event with `INSERT ...
 ON CONFLICT (event_id) DO NOTHING` and commits the Kafka offset only *after*
@@ -66,8 +66,8 @@ safe. At-least-once delivery plus an idempotent consumer gives an
 exactly-once *effect*.
 
 **librdkafka through a C-API RAII wrapper.** Doc 07 names librdkafka as the
-standard. The example uses its C API directly — a stable C ABI from the
-system — for the same reason 07 reaches PostgreSQL through libpq rather than
+standard. The example uses its C API directly (a stable C ABI from the
+system) for the same reason 07 reaches PostgreSQL through libpq rather than
 libpqxx: no Conan C++ recipe to fight, no libstdc++ ABI mixing.
 
 ## How to run
@@ -89,7 +89,7 @@ CI verification: `scripts/test-stateless-demo-07-outbox-pattern.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Docker 29.x — a create that
+Representative output on a Fedora 44 host with Docker 29.x: a create that
 writes order + outbox atomically, the relay publishing it, the consumer
 applying it, then a duplicate event being deduped:
 
@@ -116,7 +116,7 @@ applying it, then a duplicate event being deduped:
 
 - **Act 1 writes two rows in one transaction.** The order and its outbox
   event commit together. There is no instant where the order exists but the
-  event doesn't — that atomicity is the whole point of the pattern.
+  event doesn't; that atomicity is the whole point of the pattern.
 - **The relay's `FOR UPDATE SKIP LOCKED` log line is the multi-replica
   enabler.** It locks only the rows it's processing and skips rows another
   relay holds, so you can run several relays without double-publishing.
@@ -124,41 +124,41 @@ applying it, then a duplicate event being deduped:
   idempotent consumer: the second delivery of `evt-1` hits the `ON CONFLICT
   (event_id)` and applies nothing. The projection row count staying at 1 is
   the exactly-once *effect*.
-- **If act 3 ever bumps the count to 2**, the consumer isn't idempotent — it
+- **If act 3 ever bumps the count to 2**, the consumer isn't idempotent; it
   applied a duplicate. The `event_id` UNIQUE constraint plus committing the
   offset *after* the DB write is what prevents that.
 
 ## Files
 
-- `proto/order.proto` — `OrderService`, the producer's front door
-- `src/pg_pool.hpp` — process-scoped libpq pool + `ScopedConnection` (reused
+- `proto/order.proto`: `OrderService`, the producer's front door
+- `src/pg_pool.hpp`: process-scoped libpq pool + `ScopedConnection` (reused
   from state externalization)
-- `src/kafka.hpp` — RAII wrappers over the librdkafka C API
-- `src/order_svc.cpp` — gRPC producer: order + outbox in one transaction
-- `src/relay.cpp` — outbox poller (`run`) + a one-shot `produce` mode
-- `src/consumer.cpp` — Kafka → idempotent projection
-- `src/client.cpp` — the gRPC client
-- `CMakeLists.txt` — four binaries
-- `conanfile.py` — gRPC + protobuf + abseil (libpq + librdkafka are system)
-- `Containerfile` — UBI 10 builder; librdkafka built from source (no
+- `src/kafka.hpp`: RAII wrappers over the librdkafka C API
+- `src/order_svc.cpp`: gRPC producer: order + outbox in one transaction
+- `src/relay.cpp`: outbox poller (`run`) + a one-shot `produce` mode
+- `src/consumer.cpp`: Kafka → idempotent projection
+- `src/client.cpp`: the gRPC client
+- `CMakeLists.txt`: four binaries
+- `conanfile.py`: gRPC + protobuf + abseil (libpq + librdkafka are system)
+- `Containerfile`: UBI 10 builder; librdkafka built from source (no
   el10 package, EPEL 10 doesn't ship it either); `ubi-minimal` runtime
-- `compose.yml` — postgres + kafka (Strimzi) + producer + relay + consumer
-- `demo.sh` — the three acts
+- `compose.yml`: postgres + kafka (Strimzi) + producer + relay + consumer
+- `demo.sh`: the three acts
 
 ## Caveats and gotchas
 
 - **librdkafka is built from source.** It has no UBI-native package, and
   unlike on UBI 9 (where it came from EPEL 9), EPEL 10 doesn't ship it
-  either — so the builder stage clones and compiles it. Everything else
+  either, so the builder stage clones and compiles it. Everything else
   stays on UBI/Conan.
 - **The consumer commits the offset *after* the DB write, never before.**
   This ordering is what makes at-least-once safe: if it crashes after applying
   but before committing the offset, the event redelivers and the idempotent
   `ON CONFLICT` makes the re-apply a no-op. Commit the offset first and you'd
-  have at-most-once — the lost-event bug, reintroduced.
+  have at-most-once (the lost-event bug, reintroduced).
 - **`kcat` is optional.** It's only a window onto the bus for inspecting the
   topic from the host (`sudo dnf install kcat`). Neither the demo nor the
-  test needs it — idempotency is exercised by the relay's one-shot `produce`
+  test needs it; idempotency is exercised by the relay's one-shot `produce`
   mode, which injects the duplicate directly.
 - **The payload is stored raw.** The teaching version stores the event
   payload as a raw string; production would parse it with a JSON library and
@@ -169,12 +169,12 @@ applying it, then a duplicate event being deduped:
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Enberg, *Latency*, ch. 5** — the cost and failure modes of crossing a
+- **Enberg, *Latency*, ch. 5**: the cost and failure modes of crossing a
   process boundary; why the dual-write window exists and what closes it
-- **Iglberger, *C++ Software Design*, ch. 2** — separation of concerns: the
+- **Iglberger, *C++ Software Design*, ch. 2**: separation of concerns: the
   producer, relay, and consumer as independent components with one
   responsibility each
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 9** — the RAII wrappers
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 9**: the RAII wrappers
   over the librdkafka C API; owning a C resource safely from C++
 
 ## Production note
@@ -188,8 +188,8 @@ apply are the parts worth keeping.
 ## Where it sits in the compendium
 
 The outbox builds directly on
-[state externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }}) —
-same `pg_pool.hpp`, same `ON CONFLICT` idempotency — and extends it with
+[state externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }})
+(same `pg_pool.hpp`, same `ON CONFLICT` idempotency) and extends it with
 atomic event emission. The idempotent-consumer discipline is the same
 authoritative-dedup idea the end-to-end example
 ([Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}))

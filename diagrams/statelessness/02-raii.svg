@@ -64,7 +64,7 @@
   <rect width="920" height="500" fill="url(#grid)"/>
 
   <text x="460" y="34" text-anchor="middle" class="ttl">RequestContext: RAII as the per-request scope</text>
-  <text x="460" y="54" text-anchor="middle" class="cap">Constructor acquires · body uses · destructor releases — on every exit path</text>
+  <text x="460" y="54" text-anchor="middle" class="cap">Constructor acquires · body uses · destructor releases: on every exit path</text>
 
   <!-- request enters -->
   <rect class="step step-acq" x="60" y="85" width="800" height="36"/>
@@ -89,13 +89,13 @@
 
   <!-- handler body -->
   <rect class="step step-use" x="100" y="265" width="720" height="60"/>
-  <text x="460" y="285" text-anchor="middle" class="pttl">handler body uses ctx — may throw, may early-return</text>
+  <text x="460" y="285" text-anchor="middle" class="pttl">handler body uses ctx: may throw, may early-return</text>
   <text x="460" y="305" text-anchor="middle" class="step-tm">auto row = ctx.conn->query(sql);  ctx.span->set("rows", row.n);</text>
   <text x="460" y="320" text-anchor="middle" class="step-tm">if (...) return Status::CANCELLED;  // RAII still runs</text>
 
   <!-- destructor (reverse order) -->
   <rect class="step step-rel" x="100" y="340" width="720" height="80"/>
-  <text x="460" y="360" text-anchor="middle" class="pttl-ok">} // ~RequestContext()   — reverse order of construction:</text>
+  <text x="460" y="360" text-anchor="middle" class="pttl-ok">} // ~RequestContext()  : reverse order of construction:</text>
   <rect class="step" x="125" y="370" width="220" height="40"/>
   <text x="235" y="388" text-anchor="middle" class="step-tm">ctx.span ends</text>
   <text x="235" y="404" text-anchor="middle" class="lbl">exported to OTel collector</text>
@@ -107,6 +107,6 @@
   <text x="695" y="404" text-anchor="middle" class="lbl">single deallocation</text>
 
   <!-- callout below -->
-  <text x="460" y="465" text-anchor="middle" class="ok-l">Three exit paths — return, return Status, throw — all fire the destructor.</text>
+  <text x="460" y="465" text-anchor="middle" class="ok-l">Three exit paths: return, return Status, throw: all fire the destructor.</text>
   <text x="460" y="483" text-anchor="middle" class="lbl">This is what makes "stateful work, stateless posture" tractable in C++.</text>
 </svg>

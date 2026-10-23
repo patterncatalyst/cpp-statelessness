@@ -70,7 +70,7 @@
   <rect class="step" x="280" y="80" width="360" height="80"/>
   <text x="460" y="100" text-anchor="middle" class="pttl">Shared sources (one tree)</text>
   <text x="460" y="120" text-anchor="middle" class="step-tm">src/ · include/ · CMakeLists.txt · conanfile.py</text>
-  <text x="460" y="138" text-anchor="middle" class="step-tm">conan.lock — pins every dep version, identical across profiles</text>
+  <text x="460" y="138" text-anchor="middle" class="step-tm">conan.lock: pins every dep version, identical across profiles</text>
   <text x="460" y="153" text-anchor="middle" class="lbl">profile is the ONLY thing that differs between the two columns</text>
 
   <!-- Two arrow paths down to profile cells -->
@@ -79,7 +79,7 @@
 
   <!-- LEFT column: dev profile -->
   <rect class="panel-bad" x="30" y="195" width="400" height="270"/>
-  <text x="230" y="218" text-anchor="middle" class="pttl-bad">profiles/dev — fast feedback</text>
+  <text x="230" y="218" text-anchor="middle" class="pttl-bad">profiles/dev: fast feedback</text>
 
   <rect class="step step-leak" x="50" y="235" width="360" height="60"/>
   <text x="230" y="255" text-anchor="middle" class="step-tm">[settings]   build_type=Debug</text>
@@ -96,11 +96,11 @@
   <text x="230" y="416" text-anchor="middle" class="step-tm">ninja                (parallel · incremental)</text>
 
   <rect class="step step-leak" x="50" y="437" width="360" height="22"/>
-  <text x="230" y="453" text-anchor="middle" class="bad-l">dev binary — instrumented · ~50× slower · catches UB at runtime</text>
+  <text x="230" y="453" text-anchor="middle" class="bad-l">dev binary: instrumented · ~50× slower · catches UB at runtime</text>
 
   <!-- RIGHT column: release profile -->
   <rect class="panel-ok" x="490" y="195" width="400" height="270"/>
-  <text x="690" y="218" text-anchor="middle" class="pttl-ok">profiles/release — for the image</text>
+  <text x="690" y="218" text-anchor="middle" class="pttl-ok">profiles/release: for the image</text>
 
   <rect class="step step-rel" x="510" y="235" width="360" height="60"/>
   <text x="690" y="255" text-anchor="middle" class="step-tm">[settings]   build_type=Release</text>
@@ -117,5 +117,5 @@
   <text x="690" y="416" text-anchor="middle" class="step-tm">ninja                (LTO link, slowest step)</text>
 
   <rect class="step step-rel" x="510" y="437" width="360" height="22"/>
-  <text x="690" y="453" text-anchor="middle" class="ok-l">release binary — hardened · PIE · stripped · for ubi-micro</text>
+  <text x="690" y="453" text-anchor="middle" class="ok-l">release binary: hardened · PIE · stripped · for ubi-micro</text>
 </svg>

@@ -7,13 +7,27 @@ sectionid: docs
 part: operational
 ---
 
-# 08 — The Ephemeral Filesystem Trap
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Recognize which container filesystem writes survive a restart and which disappear silently
+- Configure `read_only: true` / `readOnlyRootFilesystem: true` so unsupported writes fail loudly instead of vanishing
+- Route C++ logging, crash dumps, and diagnostic output to stdout/stderr instead of local files
+- Identify the classic C++ library traps (spdlog defaults, ML model caches, protobuf temp files, prometheus_cpp textfiles) that write to ephemeral paths
+- Size tmpfs mounts and Kubernetes ephemeral-storage budgets, and account for UID-remapping effects on bind mounts
+
+## Why this matters
+
+A C++ service that assumes `/var/log` or `/opt/cache` survive restarts works fine in a developer's shell and only fails after the first production redeploy, when the crash dump, the cached model, or the log file an on-call engineer needed is simply gone. Nothing errors at write time. The writable layer is discarded along with the container, and the only symptom is missing data during an incident.
+
+Fixing this after the fact is expensive: it means auditing every `ofstream`, `tmpfile`, and library default across a codebase while production is already serving traffic on the wrong assumption. Treating the filesystem as ephemeral from the first commit, enforced by a read-only rootfs, turns each of those assumptions into a loud, in-development `EROFS` failure instead of a silent data-loss bug discovered mid-outage.
 
 ## Thesis
 
-The container filesystem is ephemeral. Anything written outside an explicitly-mounted volume — log files, crash dumps, cached compiled regexes, downloaded model weights, temporary parse trees — disappears when the container restarts. The kernel does not warn the application; the writes succeed, the file descriptors close cleanly, the data is simply gone on the next start. For a C++ developer coming from monolithic-server backgrounds, where `/var/log/myservice/` survived restarts and `/var/cache/` outlived process lifetimes, this is the assumption most likely to silently break in production.
+The container filesystem is ephemeral. Anything written outside an explicitly-mounted volume (log files, crash dumps, cached compiled regexes, downloaded model weights, temporary parse trees) disappears when the container restarts. The kernel does not warn the application; the writes succeed, the file descriptors close cleanly, the data is simply gone on the next start. For a C++ developer coming from monolithic-server backgrounds, where `/var/log/myservice/` survived restarts and `/var/cache/` outlived process lifetimes, this is the assumption most likely to silently break in production.
 
-The right framing is that ephemerality is a feature, not a bug. It is the operational counterpart to the architectural property the rest of this doc set has been describing: a stateless service must be killable and replaceable; its filesystem inherits the same property. The fix is not to fight the model — pinning the container to a node, mounting `/var/log` to a shared filesystem, adding handlers that snapshot to disk before exit — but to embrace it. Logs go to stdout. Temporary files go to a tmpfs that is sized and recycled correctly. Files that must persist go to explicitly-named volumes. The rootfs is read-only, enforced by `read_only: true` in compose or `readOnlyRootFilesystem: true` in Kubernetes, so accidental writes fail loudly.
+The right framing is that ephemerality is a feature, not a bug. It is the operational counterpart to the architectural property the rest of this doc set has been describing: a stateless service must be killable and replaceable; its filesystem inherits the same property. The fix is not to fight the model by pinning the container to a node, mounting `/var/log` to a shared filesystem, or adding handlers that snapshot to disk before exit; it is to embrace the model. Logs go to stdout. Temporary files go to a tmpfs that is sized and recycled correctly. Files that must persist go to explicitly-named volumes. The rootfs is read-only, enforced by `read_only: true` in compose or `readOnlyRootFilesystem: true` in Kubernetes, so accidental writes fail loudly.
 
 This document covers the C++ patterns for getting that right: the container layer model that produces the ephemerality, the read-only-rootfs enforcement pattern, the specific C++ libraries that quietly write files in ways that will not survive a restart, the ephemeral-storage budget in Kubernetes, and the UID-mapping quirks that affect development workflows under a user-namespaced Docker (or Podman's rootless default).
 
@@ -21,7 +35,7 @@ This document covers the C++ patterns for getting that right: the container laye
 
 ## The container layer model
 
-A container image is built as a stack of read-only layers. At runtime, the container runtime — runc, crun, or similar — adds a writable layer on top, implemented via overlayfs. Reads come from the topmost layer that contains the file; writes go to the writable layer. When the container exits, the writable layer is removed. Image layers persist (they belong to the image, not the container instance); the writable layer does not.
+A container image is built as a stack of read-only layers. At runtime, the container runtime (runc, crun, or similar) adds a writable layer on top, implemented via overlayfs. Reads come from the topmost layer that contains the file; writes go to the writable layer. When the container exits, the writable layer is removed. Image layers persist (they belong to the image, not the container instance); the writable layer does not.
 
 This is true of Docker, Podman, Kubernetes' container runtimes, and any OCI-compliant implementation. The semantics are uniform. What varies is the syntax for enforcing read-only on the rootfs, for adding tmpfs mounts, and for adding persistent volumes.
 
@@ -84,7 +98,7 @@ spec:
 
 The two are semantically equivalent: rootfs read-only, `/tmp` writable as tmpfs with a size cap, a persistent volume mounted at a specific path. The Kubernetes side adds `ephemeral-storage` resource accounting, which has no direct Docker analogue.
 
-The forcing function — turning on read-only rootfs from day one — is the most useful single configuration choice in this space. Without it, accidental writes to `/var/log/` or `/opt/cache/` succeed silently in development and disappear silently in production. With it, the same writes fail loudly with `EROFS`, which surfaces during testing and gets fixed before deploy.
+The forcing function, turning on read-only rootfs from day one, is the most useful single configuration choice in this space. Without it, accidental writes to `/var/log/` or `/opt/cache/` succeed silently in development and disappear silently in production. With it, the same writes fail loudly with `EROFS`, which surfaces during testing and gets fixed before deploy.
 
 > **Opinion.** `read_only: true` should be the default for every C++ service container. The cost is a small upfront audit of "what does my code actually write, and where"; the return is that the audit ever happens. Services that opt out of read-only rootfs accumulate silent dependencies on writable paths that nobody documented.
 
@@ -96,9 +110,9 @@ The rootfs is read-only. Anything baked into the image at build time lives here:
 
 A small tmpfs at `/tmp` (and possibly `/run`) is writable, in-memory, and recycled on restart. Anything temporary lives here: `std::tmpfile` output, in-flight protobuf serialization buffers when they need to spill, the gRPC channel's name-resolution scratch space, ML model deserialization intermediates. The size is bounded by the tmpfs `size=` parameter; under tight memory budgets, this counts against the container's RSS, so size it sparingly.
 
-Persistent volumes mounted at specific paths are writable and survive restarts. Anything stateful that must outlive the container belongs here — a local SQLite database, a downloaded ML model file, a cached compiled regex set. The lifetime is decoupled from the container's; on restart, the new container sees the previous container's writes.
+Persistent volumes mounted at specific paths are writable and survive restarts. Anything stateful that must outlive the container belongs here (a local SQLite database, a downloaded ML model file, a cached compiled regex set). The lifetime is decoupled from the container's; on restart, the new container sees the previous container's writes.
 
-The lifetime contract for each category is explicit. The C++ code can rely on `/tmp` being writable and on the rootfs not being writable. Volume mount paths are part of the deployment contract — the service expects them, the deployment provides them, mismatches surface at startup as "permission denied" or "no such file."
+The lifetime contract for each category is explicit. The C++ code can rely on `/tmp` being writable and on the rootfs not being writable. Volume mount paths are part of the deployment contract: the service expects them, the deployment provides them, mismatches surface at startup as "permission denied" or "no such file."
 
 ## Logs go to stdout
 
@@ -106,7 +120,7 @@ The 12-factor logs-as-event-streams principle ([Doc 06 (12-factor)]({{ '/docs/06
 
 The fix is `stdout`. The container runtime captures the process's stdout and stderr, ships them to a logging driver (Docker's `json-file` or `journald` driver, Kubernetes' container-runtime-managed logs), which forwards to Loki or whatever aggregator the deployment uses. The application does not own log rotation; the orchestrator does.
 
-For spdlog — the most common modern C++ logging library — the configuration looks like:
+For spdlog (the most common modern C++ logging library), the configuration looks like:
 
 ```cpp
 #include <spdlog/spdlog.h>
@@ -126,13 +140,13 @@ The stdout sink, the JSON pattern, the level from config. No file path, no rotat
 
 A common variant in C++ services is to write to stderr for error-level logs and stdout for everything else. Most logging drivers preserve the distinction; some don't. The 12-factor canon says all logs to stdout; either is acceptable in practice, and stdout-only is simpler.
 
-> **Opinion.** Configure structured JSON logging from day one. The Grafana stack — Loki for storage, Tempo for traces, Mimir for metrics — assumes structured input, and parsing free-form log lines after the fact is a significant time sink. spdlog with a JSON pattern, the OTel C++ SDK's log exporter, or a small custom sink against `nlohmann::json` all work. Pick one and standardize.
+> **Opinion.** Configure structured JSON logging from day one. The Grafana stack (Loki for storage, Tempo for traces, Mimir for metrics) assumes structured input, and parsing free-form log lines after the fact is a significant time sink. spdlog with a JSON pattern, the OTel C++ SDK's log exporter, or a small custom sink against `nlohmann::json` all work. Pick one and standardize.
 
 ## The classic C++ traps
 
 Several patterns common in C++ codebases produce writes that fail (under read-only rootfs) or vanish (without it). They are worth auditing for explicitly.
 
-The first is **logging library defaults**. spdlog's `basic_logger_mt("name", "logs/log.txt")` writes to a file; the file path is relative to the working directory; the working directory inside a container is usually `/`. The first write fails with `EROFS`. Other logging libraries — glog, log4cplus, even custom wrappers around `std::ofstream` — have the same trap. Configure to stdout explicitly; do not rely on defaults.
+The first is **logging library defaults**. spdlog's `basic_logger_mt("name", "logs/log.txt")` writes to a file; the file path is relative to the working directory; the working directory inside a container is usually `/`. The first write fails with `EROFS`. Other logging libraries (glog, log4cplus, even custom wrappers around `std::ofstream`) have the same trap. Configure to stdout explicitly; do not rely on defaults.
 
 > **Run this pattern.** A runnable companion lives at
 > [`examples/statelessness/08-ephemeral-filesystem/`]({{ '/examples/statelessness-08-ephemeral-filesystem/' | relative_url }}).
@@ -159,11 +173,11 @@ The trace lands in the container log, gets shipped to Loki, is searchable from t
 
 The third is **ML model caches**. A service that loads a model from a remote bucket on first use and caches it locally typically writes to `/opt/cache/` or `~/.cache/`. Under read-only rootfs, the write fails. The fix depends on the model size: small models (under a few MB) can live in the image itself, baked at build time; medium models go in a persistent volume mounted at a known path; large models stay remote and are loaded into memory on each cold start, with the cold-start cost amortized over the long-lived process.
 
-The fourth is **protobuf temporary files**. Some protobuf operations — large schema parses, certain reflection paths — spill to disk via `std::tmpfile` or platform-equivalent. As long as `/tmp` is mounted as tmpfs and sized adequately, this is fine; without an explicit `/tmp` tmpfs, it fails. The tmpfs is the standard mitigation.
+The fourth is **protobuf temporary files**. Some protobuf operations (large schema parses, certain reflection paths) spill to disk via `std::tmpfile` or platform-equivalent. As long as `/tmp` is mounted as tmpfs and sized adequately, this is fine; without an explicit `/tmp` tmpfs, it fails. The tmpfs is the standard mitigation.
 
 The fifth is **coverage and profiling data**. Running tests inside a container with `--coverage` (gcov) writes `.gcda` files relative to the source directory. Inside the container, the source directory is wherever the build system put it, typically read-only because the image was built from those sources. The fix in CI is to mount a writable volume at the source path for the coverage run, or to bind-mount the host's source tree, or to override `GCOV_PREFIX`. None of this is hard, but it is the kind of thing that surprises the first time the CI run lands in a container.
 
-The sixth is **prometheus_cpp metric snapshots**. The library can write a metric textfile to disk for the node_exporter textfile collector pattern. Useful in some deployment models, useless in container-native ones — Prometheus or the OTel collector should be scraping over the network instead. Disable the file output; expose `/metrics` over HTTP.
+The sixth is **prometheus_cpp metric snapshots**. The library can write a metric textfile to disk for the node_exporter textfile collector pattern. Useful in some deployment models, useless in container-native ones; Prometheus or the OTel collector should be scraping over the network instead. Disable the file output; expose `/metrics` over HTTP.
 
 > **Opinion.** The audit for "where does this code write" is mechanical: `grep -rn 'ofstream\|tmpfile\|fopen\|::open' .` and review each hit. Most production C++ codebases discover one or two hits that nobody knew about. The cleanup pays back in deployment portability.
 
@@ -179,19 +193,19 @@ resources:
     ephemeral-storage: 1Gi
 ```
 
-When the limit is exceeded, the pod is evicted. The eviction is graceful — the pod gets a SIGTERM and a grace period — but it is still a restart, and persistent state in `emptyDir` is lost.
+When the limit is exceeded, the pod is evicted. The eviction is graceful (the pod gets a SIGTERM and a grace period), but it is still a restart, and persistent state in `emptyDir` is lost.
 
 For a C++ service the common path to exceeding the budget is log volume. A service that writes 100 log lines per second at 200 bytes each produces about 1.6 GB per day of log output. Even if the orchestrator ships logs to Loki, the local copy is retained briefly (typically until it hits a per-file size limit and rotates), and rotated files accumulate against the ephemeral-storage budget until they're shipped and deleted.
 
 The mitigations are structural: structured log levels (`info` in production, not `debug`), rate sampling on high-volume events (one in 100 cache-miss messages logged, all errors logged), and ensuring the logging driver ships aggressively enough that rotated files don't accumulate. [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers Loki's promtail configuration for the Docker/compose side; Kubernetes uses Fluent Bit or similar.
 
-Docker does not have a direct ephemeral-storage limit equivalent. The host filesystem is the limit, and runaway log volume on a development machine fills the disk. The mitigation is the same — structured levels and sampling — but the enforcement is host-level rather than per-container.
+Docker does not have a direct ephemeral-storage limit equivalent. The host filesystem is the limit, and runaway log volume on a development machine fills the disk. The mitigation is the same (structured levels and sampling), but the enforcement is host-level rather than per-container.
 
 ## User-namespace remapping and the UID story
 
-Standard Docker Engine runs the daemon as root and, by default, does **not** remap container UIDs to a different range on the host. A container process running as UID 1000 writes files that show up as UID 1000 on the host too — no surprises, no offset. That's simpler than Podman's story, but it's also less isolation: a process that escapes the container runs with the UID it had inside.
+Standard Docker Engine runs the daemon as root and, by default, does **not** remap container UIDs to a different range on the host. A container process running as UID 1000 writes files that show up as UID 1000 on the host too: no surprises, no offset. That's simpler than Podman's story, but it's also less isolation: a process that escapes the container runs with the UID it had inside.
 
-Docker can opt into the same kind of UID remapping Podman defaults to, two ways: **user namespace remapping** (`userns-remap` in `/etc/docker/daemon.json`) on a normal rootful install, or running the daemon itself unprivileged (**rootless Docker**, via `dockerd-rootless-setuptool.sh`). Either way the mechanism is the one Podman uses too: `/etc/subuid` and `/etc/subgid` define a range of host UIDs the container's UID space maps into, offset by some base (commonly 100000+). The container image typically declares a `USER` directive — `USER 1000` or `USER service`. With remapping on, that UID maps to a different UID outside, and the file ownership it produces can be surprising:
+Docker can opt into the same kind of UID remapping Podman defaults to, two ways: **user namespace remapping** (`userns-remap` in `/etc/docker/daemon.json`) on a normal rootful install, or running the daemon itself unprivileged (**rootless Docker**, via `dockerd-rootless-setuptool.sh`). Either way the mechanism is the one Podman uses too: `/etc/subuid` and `/etc/subgid` define a range of host UIDs the container's UID space maps into, offset by some base (commonly 100000+). The container image typically declares a `USER` directive: `USER 1000` or `USER service`. With remapping on, that UID maps to a different UID outside, and the file ownership it produces can be surprising:
 
 ```bash
 $ docker run --rm -v $PWD:/data -u 1000 alpine touch /data/file
@@ -199,15 +213,15 @@ $ ls -la file
 -rw-r--r--  1 100999  100999  0 Nov  2 10:24 file
 ```
 
-The file is owned by UID 100999 from the host's perspective — the remap's offset of the container's UID 1000. From inside any future container with the same mapping, it's owned by UID 1000. From the host shell, it looks weird.
+The file is owned by UID 100999 from the host's perspective: the remap's offset of the container's UID 1000. From inside any future container with the same mapping, it's owned by UID 1000. From the host shell, it looks weird.
 
 For development workflows this affects bind mounts whenever remapping is active. Code edited on the host and bind-mounted into the container must have permissions that allow the in-container user to read or write it. Source code mounted read-only is straightforward; cache directories mounted writable need either the container UID to match the host UID (run as the developer, not as a service user) or explicit `chown` on container start.
 
-For production this rarely matters — production images run as a fixed UID, persistent volumes are sized and permissioned at provisioning time, no host bind mounts exist. The UID-remapping story is primarily a development concern, and only surfaces when remapping is actually turned on.
+For production this rarely matters: production images run as a fixed UID, persistent volumes are sized and permissioned at provisioning time, no host bind mounts exist. The UID-remapping story is primarily a development concern, and only surfaces when remapping is actually turned on.
 
-Rootless Docker storage lives under `~/.local/share/docker/` on the host (vs. `/var/lib/docker/` for a standard rootful install). Image layers, container writable layers, volumes — all under there. Knowing this is useful for cleanup (`docker system prune`) and for understanding where space goes.
+Rootless Docker storage lives under `~/.local/share/docker/` on the host (vs. `/var/lib/docker/` for a standard rootful install). Image layers, container writable layers, and volumes all live under there. Knowing this is useful for cleanup (`docker system prune`) and for understanding where space goes.
 
-**Podman differs here:** Podman's rootless mode is the default, not an opt-in — every Podman user hits the UID-remap story on day one, with storage under `~/.local/share/containers/storage/` and cleanup via `podman system prune`. Docker's remap is opt-in, so most Docker installs never produce a UID 100999 in `ls -la` output at all. Once either engine is actually in remapped mode, the mechanism and the mitigation are identical.
+**Podman differs here:** Podman's rootless mode is the default, not an opt-in: every Podman user hits the UID-remap story on day one, with storage under `~/.local/share/containers/storage/` and cleanup via `podman system prune`. Docker's remap is opt-in, so most Docker installs never produce a UID 100999 in `ls -la` output at all. Once either engine is actually in remapped mode, the mechanism and the mitigation are identical.
 
 ## Detecting filesystem writes at startup
 
@@ -242,7 +256,7 @@ void verify_filesystem_assumptions() {
 }
 ```
 
-The startup check runs after configuration parsing, before the gRPC server starts. Failures result in the process exiting with a clear error rather than discovering the misconfiguration mid-handler when a log write fails. The rootfs check is a soft warning rather than a hard error — some environments legitimately allow writable rootfs — but seeing it in the logs prompts an audit.
+The startup check runs after configuration parsing, before the gRPC server starts. Failures result in the process exiting with a clear error rather than discovering the misconfiguration mid-handler when a log write fails. The rootfs check is a soft warning rather than a hard error (some environments legitimately allow writable rootfs), but seeing it in the logs prompts an audit.
 
 ## A note on restart semantics
 
@@ -250,7 +264,7 @@ The data-loss-on-restart property is sometimes treated as a problem to mitigate.
 
 The healthy pattern is to assume restart is frequent and operationally cheap. State that matters lives in backing services ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})). The container's writable storage is for transient things: in-flight scratch space, short-lived caches that can be rebuilt from the authoritative source, ephemeral diagnostics. Restart is then a non-event.
 
-The exception is services that own local state — databases, queue brokers, cache servers. Those are run as StatefulSets in Kubernetes or with named volumes in Docker, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
+The exception is services that own local state (databases, queue brokers, cache servers). Those are run as StatefulSets in Kubernetes or with named volumes in Docker, with explicit volume management and explicit awareness that the container's identity matters across restarts. This is a different operational model; the rest of this doc set has been about stateless services that don't need it.
 
 ## Recommendation summary
 
@@ -297,8 +311,8 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **OpenTelemetry C++ SDK documentation, "Logs" section.** The OTel logging exporter is an alternative to spdlog's stdout sink, sending logs directly to an OTLP endpoint. Tighter integration with traces and spans; slightly more complex setup. Either is acceptable.
 
-**"Building Low Latency Applications with C++".** The chapter on persistent state covers the cases where local filesystem persistence is needed — typically database engines, queue brokers, embedded systems. Useful as the boundary case for when statelessness does not apply.
+**"Building Low Latency Applications with C++".** The chapter on persistent state covers the cases where local filesystem persistence is needed (typically database engines, queue brokers, embedded systems). Useful as the boundary case for when statelessness does not apply.
 
 **Linux kernel documentation on overlayfs, tmpfs, and the various `mount(2)` options.** Background reading for the layer model and the tmpfs sizing.
 
-**Iglberger, *C++ Software Design*.** The dependency-injection chapter applies to how logging and crash-handling subsystems are wired — configurable sinks rather than hardcoded file paths is the same pattern as configurable backing services in [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
+**Iglberger, *C++ Software Design*.** The dependency-injection chapter applies to how logging and crash-handling subsystems are wired: configurable sinks rather than hardcoded file paths is the same pattern as configurable backing services in [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).

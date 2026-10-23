@@ -7,25 +7,39 @@ sectionid: docs
 part: request-scope
 ---
 
-# 02 — RAII as the Foundation for Safe Stateful Work in a Stateless Service
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Bind per-request resources to C++ scope using RAII so cleanup happens automatically on every exit path, including exceptions.
+- Apply the three exception-safety guarantees (basic, strong, no-throw) and pick the right one per operation in a handler.
+- Build a `RequestContext` type that bundles per-request state (span, deadline, arena, connection) with destruction order matching the conceptual unwind order.
+- Identify and fix the common RAII mistakes: throwing destructors, raw `new`/`delete`, locks held across `co_await`, and manual try/catch cleanup.
+- Reason about the performance cost of construction and destruction in a hot path, including the destruction-asymmetry win from allocator choice.
+
+## Why this matters
+
+A stateless service still holds plenty of state inside a single request: a parsed message, a database connection, a span, a half-built response. If that state is not released cleanly on every exit path, including early returns and exceptions, the service leaks connections, holds locks past their legitimate owner, or lets a crash in one handler take the whole process down. Under an orchestrator that kills and restarts replicas routinely, a resource leak that would be a slow background problem in a long-lived monolith becomes a fast path to pool exhaustion and cascading failures across every replica sharing that backing pool.
+
+RAII is the mechanism that makes the request boundary structurally reliable instead of a convention that depends on every code path remembering to clean up. Without it, correctness depends on matching every `acquire()` with the right `release()` by hand across every branch, which is exactly the kind of bookkeeping that degrades under maintenance pressure and shows up later as random-looking production failures.
 
 ## Thesis
 
-A stateless service still has plenty of state — just not the kind that survives a request. Inside a single request handler, the service routinely holds: a parsed request message, intermediate computations, a span context for tracing, a deadline, a checked-out database connection, perhaps a per-request memory arena, locks acquired and released, and a half-built response. All of this is state. None of it should outlive the request.
+A stateless service still has plenty of state, just not the kind that survives a request. Inside a single request handler, the service routinely holds: a parsed request message, intermediate computations, a span context for tracing, a deadline, a checked-out database connection, perhaps a per-request memory arena, locks acquired and released, and a half-built response. All of this is state. None of it should outlive the request.
 
-The C++ mechanism for making "doesn't outlive the request" structurally true is RAII — Resource Acquisition Is Initialization. Resources are wrapped in objects whose constructors acquire and whose destructors release. Object lifetimes are bound to scope. When a scope exits — normally or via exception — destructors run in reverse construction order, releasing everything. The discipline is to make the conceptual boundary (request, RPC, transaction, span) match a C++ scope, and to put all per-request state inside RAII types whose lifetimes coincide with that scope.
+The C++ mechanism for making "doesn't outlive the request" structurally true is RAII: Resource Acquisition Is Initialization. Resources are wrapped in objects whose constructors acquire and whose destructors release. Object lifetimes are bound to scope. When a scope exits, normally or via exception, destructors run in reverse construction order, releasing everything. The discipline is to make the conceptual boundary (request, RPC, transaction, span) match a C++ scope, and to put all per-request state inside RAII types whose lifetimes coincide with that scope.
 
-Done well, this gives both correctness — no resource leaks, no stale state crossing into the next request — and performance — deterministic destruction at well-defined points, no GC pauses, no fragmented cleanup. Done badly — manual cleanup, raw pointers, throwing destructors, locks held across `co_await` — and the service slowly leaks resources, holds shared state across requests, and surfaces correctness bugs that look random.
+Done well, this gives both correctness (no resource leaks, no stale state crossing into the next request) and performance (deterministic destruction at well-defined points, no GC pauses, no fragmented cleanup). Done badly (manual cleanup, raw pointers, throwing destructors, locks held across `co_await`), and the service slowly leaks resources, holds shared state across requests, and surfaces correctness bugs that look random.
 
-This document covers the RAII discipline for a stateless service: how to model request-scoped state as RAII types, the canonical gRPC pattern, the common mistakes, the counterexample of manual cleanup that goes wrong, and the performance angle the project brief specifically asked for — how the constants of construction and destruction matter in a hot path.
+This document covers the RAII discipline for a stateless service: how to model request-scoped state as RAII types, the canonical gRPC pattern, the common mistakes, the counterexample of manual cleanup that goes wrong, and the performance angle: how the constants of construction and destruction matter in a hot path.
 
 {% include excalidraw.html name="statelessness/02-raii" caption="RequestContext as RAII per-request scope: ctor acquires, dtor releases on every exit." %}
 
 > **Run this pattern.** A runnable companion to this document lives at
 > [`examples/statelessness/02-raii/`]({{ '/examples/statelessness-02-raii/' | relative_url }}).
 > It's a small gRPC service whose handler builds a `RequestContext` on
-> entry and takes one of three exit paths — normal return, early
-> return, and throw — with logging that proves the destructor fires on
+> entry and takes one of three exit paths (normal return, early
+> return, and throw), with logging that proves the destructor fires on
 > all three (acquire/release pairs balance; outstanding leases return
 > to zero at shutdown). Clone the repo, `cd` in, and `./demo.sh`.
 
@@ -35,7 +49,7 @@ The C++ exception-safety vocabulary distinguishes three levels.
 
 The **basic guarantee** says that on exception, no resources leak and the program remains in a valid state. The state may differ from before the operation, but no invariants are broken.
 
-The **strong guarantee** says that on exception, the program state is exactly as it was before the operation. Transactional.
+The **strong guarantee** says that on exception, the program state is exactly as it was before the operation: transactional.
 
 The **no-throw guarantee** says the operation does not throw. Destructors must offer this; move operations should where possible.
 
@@ -43,7 +57,7 @@ In a request handler, the practical target is the basic guarantee everywhere, th
 
 > **Opinion.** A handler that doesn't think clearly about which guarantee it offers will accidentally offer "none." Pick one explicitly per operation, and let the type system enforce it. Most handlers can target the basic guarantee throughout; reach for the strong guarantee only where authoritative external state is being changed.
 
-RAII gives the basic guarantee automatically: any resource owned by an RAII object is released on scope exit, exception or not. The strong guarantee requires more — typically a copy-then-swap pattern or transactional database semantics. The no-throw guarantee for destructors is essentially required by the language: if a destructor throws while another exception is propagating, `std::terminate` is called and the process dies.
+RAII gives the basic guarantee automatically: any resource owned by an RAII object is released on scope exit, exception or not. The strong guarantee requires more, typically a copy-then-swap pattern or transactional database semantics. The no-throw guarantee for destructors is essentially required by the language: if a destructor throws while another exception is propagating, `std::terminate` is called and the process dies.
 
 ## The gRPC request boundary
 
@@ -68,7 +82,7 @@ grpc::ServerUnaryReactor* MyService::DoWork(
 
 The handler's stack frame defines the request scope. Locals constructed on it are destroyed in reverse order when the handler returns. This is the C++ scope that should hold every per-request resource: span, arena, DB transaction, deadline, response builder. Get this right and the rest of the discipline follows.
 
-A subtlety with the callback API: the handler returns the reactor pointer and the actual reply work may continue asynchronously, especially for streaming. If state must outlive the handler's return — typical for streaming reactors — that state is owned by the reactor object, and the reactor itself is request-scoped (gRPC destroys it when streaming completes). The principle is the same: state has a defined lifetime bound to the request, just one level out.
+A subtlety with the callback API: the handler returns the reactor pointer and the actual reply work may continue asynchronously, especially for streaming. If state must outlive the handler's return (typical for streaming reactors), that state is owned by the reactor object, and the reactor itself is request-scoped (gRPC destroys it when streaming completes). The principle is the same: state has a defined lifetime bound to the request, just one level out.
 
 ## The `RequestContext` pattern
 
@@ -163,7 +177,7 @@ grpc::ServerUnaryReactor* MyService::Compute(
 
 Members are listed in initialization order; destructors run in reverse. That is exactly what we want here: the OTel scope clears first (restoring the prior active-span TLS), then the span ends, then the arena releases all allocations in one shot, then the rest of the context falls away. There is no manual cleanup. Adding a new per-request resource means adding a new RAII member; the destruction order falls out automatically.
 
-> **Opinion.** Make `RequestContext` non-copyable and non-movable. Pass it by mutable reference into the call graph. Resist the temptation to make it `std::shared_ptr<RequestContext>` for "convenience" — that opens the door to lifetime extending past the handler scope, which defeats the whole point of binding state to request scope.
+> **Opinion.** Make `RequestContext` non-copyable and non-movable. Pass it by mutable reference into the call graph. Resist the temptation to make it `std::shared_ptr<RequestContext>` for "convenience": that opens the door to lifetime extending past the handler scope, which defeats the whole point of binding state to request scope.
 
 ## Common mistakes
 
@@ -201,7 +215,7 @@ return result;                      // ScopedConnection destructs on return
 
 The mechanical pattern is: every resource has an owning RAII type; acquisition is via constructor or named factory that returns the owning type; release is via destructor. No `try`/`catch` for cleanup, only for error handling.
 
-**Forgetting `noexcept` on move operations.** Standard containers like `std::vector` examine `std::is_nothrow_move_constructible_v<T>` to decide whether to move or copy on reallocation. If `T`'s move constructor is not `noexcept`, the vector copies on reallocation — a silent and substantial performance loss. Mark move constructors and move assignment `noexcept` unless they can throw.
+**Forgetting `noexcept` on move operations.** Standard containers like `std::vector` examine `std::is_nothrow_move_constructible_v<T>` to decide whether to move or copy on reallocation. If `T`'s move constructor is not `noexcept`, the vector copies on reallocation: a silent and substantial performance loss. Mark move constructors and move assignment `noexcept` unless they can throw.
 
 ## A counterexample worth recognizing
 
@@ -240,7 +254,7 @@ grpc::Status FetchAndStore(const Request* req, Response* resp) {
 }
 ```
 
-Three things wrong here. First, the early-return after (1) is the kind of thing a maintenance reviewer might add to handle a new error case and then forget to add the cleanup for. Second, the resource release ordering at (2)/(3) is implicit in the code and easy to invert during refactoring. Third, any new exception added inside the `try` block requires verifying that both pools get released — and if a future maintainer adds a `return` inside the `try`, both releases are skipped entirely.
+Three things wrong here. First, the early-return after (1) is the kind of thing a maintenance reviewer might add to handle a new error case and then forget to add the cleanup for. Second, the resource release ordering at (2)/(3) is implicit in the code and easy to invert during refactoring. Third, any new exception added inside the `try` block requires verifying that both pools get released; and if a future maintainer adds a `return` inside the `try`, both releases are skipped entirely.
 
 The RAII version is shorter and structurally cannot leak:
 
@@ -276,13 +290,13 @@ The shape of the fix is always the same: replace owning raw pointers with owning
 
 RAII is correctness machinery, but in a hot path running billions of times the constants of construction and destruction matter. Five points are worth knowing concretely.
 
-**Constructor cost is dominated by allocation.** A `std::string` constructed in a handler from a `std::string_view` requires a heap allocation unless the result is small enough to live in the string's small-buffer optimization region — typically up to 15 bytes on libstdc++, 22 on libc++ (implementation-defined; check your toolchain). For a handler that builds many short strings, SBO is a major silent optimization. For a handler that builds long strings, every construction is a malloc call: lock contention in the glibc arena, possible page faults on fresh pages, fragmentation across thread arenas. Mitigations are PMR allocators backed by a per-request arena ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), `reserve()` on `std::vector` and `std::string` to known caps, and `std::span`/`std::string_view` where ownership isn't actually needed.
+**Constructor cost is dominated by allocation.** A `std::string` constructed in a handler from a `std::string_view` requires a heap allocation unless the result is small enough to live in the string's small-buffer optimization region (typically up to 15 bytes on libstdc++, 22 on libc++; implementation-defined, check your toolchain). For a handler that builds many short strings, SBO is a major silent optimization. For a handler that builds long strings, every construction is a malloc call: lock contention in the glibc arena, possible page faults on fresh pages, fragmentation across thread arenas. Mitigations are PMR allocators backed by a per-request arena ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), `reserve()` on `std::vector` and `std::string` to known caps, and `std::span`/`std::string_view` where ownership isn't actually needed.
 
-**Destructor cost is asymmetric across allocator strategies.** A `std::unordered_map<K, V>` with N entries destroys each entry individually — N destructors, N deallocations, N pointer chases through the hash buckets. A `std::pmr::unordered_map<K, V>` backed by a `monotonic_buffer_resource` destroys each entry's destructor *and* a no-op deallocate (the arena reclaims everything in one shot when it dies). For trivially destructible value types, the per-entry destructor compiles out entirely, leaving just the arena release. This is the most concrete reason PMR pays off in handlers that build large transient structures: not the allocation savings, but the destruction-time collapse from O(N) to O(1).
+**Destructor cost is asymmetric across allocator strategies.** A `std::unordered_map<K, V>` with N entries destroys each entry individually: N destructors, N deallocations, N pointer chases through the hash buckets. A `std::pmr::unordered_map<K, V>` backed by a `monotonic_buffer_resource` destroys each entry's destructor *and* a no-op deallocate (the arena reclaims everything in one shot when it dies). For trivially destructible value types, the per-entry destructor compiles out entirely, leaving just the arena release. This is the most concrete reason PMR pays off in handlers that build large transient structures: not the allocation savings, but the destruction-time collapse from O(N) to O(1).
 
 **`noexcept` on moves is not optional.** `std::vector` reallocates by examining `std::is_nothrow_move_constructible_v<T>`. If true, it moves; if false, it copies. A type with an unmarked move loses move semantics inside `std::vector`. For per-request scratch types (request models, intermediate result structs, error contexts), making move ops `noexcept` is essentially mandatory for performance under reallocation. The same gotcha applies to `std::deque` (less commonly) and to algorithms that internally relocate via `std::move_if_noexcept`.
 
-**Trivial destructibility compiles to nothing.** A type satisfying `std::is_trivially_destructible_v<T>` has its destructor optimized out entirely. Aggregates of trivial types — POD-style request models — keep this property automatically. Adding a `std::string` member loses it; adding a `std::unique_ptr<T>` member loses it. For per-request scratch structures, prefer designs that stay trivially destructible where possible: use `std::span` views into the arena instead of `std::string` copies, use index handles into arena-backed vectors instead of pointers.
+**Trivial destructibility compiles to nothing.** A type satisfying `std::is_trivially_destructible_v<T>` has its destructor optimized out entirely. Aggregates of trivial types (POD-style request models) keep this property automatically. Adding a `std::string` member loses it; adding a `std::unique_ptr<T>` member loses it. For per-request scratch structures, prefer designs that stay trivially destructible where possible: use `std::span` views into the arena instead of `std::string` copies, use index handles into arena-backed vectors instead of pointers.
 
 **Allocator awareness is a per-type choice.** Default-allocator `std::string` and `std::vector` in a handler hit the global heap, which means lock contention in the malloc arena, fragmentation across thread arenas, and unpredictable tail latency from page faults and arena rebalancing. Allocator-aware variants (PMR or custom) move the allocation budget into a place you can reason about per request. The choice is per-type and per-call-site: a long-lived `std::string` in a process-scoped cache map doesn't need PMR; a transient `std::string` in a handler does.
 
@@ -292,7 +306,7 @@ RAII is correctness machinery, but in a hot path running billions of times the c
 
 Two C++23 additions specifically improve the RAII discipline in a service.
 
-`std::expected<T, E>` gives a value-or-error return type without exceptions. For handler-internal flow where errors are expected — validation failures, cache misses, retryable timeouts — this composes more cleanly than exception unwinding and is friendlier to the cost model of RAII destruction. The exception path still exists for exceptional cases (OOM, programmer errors); `std::expected` is for the common-but-failing path.
+`std::expected<T, E>` gives a value-or-error return type without exceptions. For handler-internal flow where errors are expected (validation failures, cache misses, retryable timeouts), this composes more cleanly than exception unwinding and is friendlier to the cost model of RAII destruction. The exception path still exists for exceptional cases (OOM, programmer errors); `std::expected` is for the common-but-failing path.
 
 ```cpp
 std::expected<UserProfile, ErrorCode>
@@ -307,17 +321,17 @@ fetch_user(const RequestContext& rc, std::string_view user_id) {
 
 The handler dispatches on the `std::expected` without a `try`/`catch`, and the RAII destruction of `conn` (release to pool) happens identically on both branches.
 
-`std::pmr::stacktrace` provides a stacktrace whose internal storage is PMR-allocated. Captured in a per-request handler with the request arena as the resource, a stacktrace at the point of an error costs nothing extra to clean up — it dies with the arena. For services that capture stacks on errors for telemetry (sending them to Tempo or as span attributes), this keeps even the diagnostic path arena-local.
+`std::pmr::stacktrace` provides a stacktrace whose internal storage is PMR-allocated. Captured in a per-request handler with the request arena as the resource, a stacktrace at the point of an error costs nothing extra to clean up: it dies with the arena. For services that capture stacks on errors for telemetry (sending them to Tempo or as span attributes), this keeps even the diagnostic path arena-local.
 
 Both features are available in GCC 14 and Clang 18 with libc++; [Doc 11 (build tooling)]({{ '/docs/11-build-tooling/' | relative_url }}) covers the build-tooling specifics for enabling them under Conan and CMake.
 
 ## Recommendation summary
 
-Every per-request resource gets an RAII owner. No raw `new`/`delete`. No raw `pool.acquire()`/`pool.release()`. No `try`/`catch` for cleanup — only for error handling.
+Every per-request resource gets an RAII owner. No raw `new`/`delete`. No raw `pool.acquire()`/`pool.release()`. No `try`/`catch` for cleanup, only for error handling.
 
 Bundle per-request state into a `RequestContext`-like type whose destruction order matches the conceptual unwind order: TLS scopes first, then spans, then arena, then everything else.
 
-Mark destructors `noexcept` — which is the default, but the explicit marker documents intent. Mark move constructors and move assignment `noexcept` unless they throw. The cost of getting this wrong is silent copy fallback in standard containers, which is hard to spot in code review and easy to see in a flamegraph.
+Mark destructors `noexcept`, which is the default, but the explicit marker documents intent. Mark move constructors and move assignment `noexcept` unless they throw. The cost of getting this wrong is silent copy fallback in standard containers, which is hard to spot in code review and easy to see in a flamegraph.
 
 Prefer trivially destructible types for per-request scratch. Use `std::span` and `std::string_view` into arena-backed storage instead of copies where ownership isn't needed.
 
@@ -327,9 +341,9 @@ Reach for `std::expected<T, E>` (C++23) for the expected-failure paths inside a 
 
 ## Cross-references
 
-[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) develops the PMR pattern specifically — `monotonic_buffer_resource`, layered pool resources, per-handler arenas, and the `std::` container choices that work well over them.
+[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) develops the PMR pattern specifically: `monotonic_buffer_resource`, layered pool resources, per-handler arenas, and the `std::` container choices that work well over them.
 
-[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped state and how its lifetime differs from request-scoped state — the State Architecture Table makes the distinction explicit and shows what belongs in each column.
+[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) covers process-scoped state and how its lifetime differs from request-scoped state: the State Architecture Table makes the distinction explicit and shows what belongs in each column.
 
 [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers threading and the `thread_local`-is-process-scope trap, which interacts with the RAII discipline: a TLS guard is itself an RAII type, but its scope is the handler, not the thread.
 
@@ -342,7 +356,7 @@ Reach for `std::expected<T, E>` (C++23) for the expected-failure paths inside a 
 _The works below are collected, with reading guidance and a cross-reference matrix, on the project [bibliography]({{ '/bibliography/' | relative_url }}) page._
 
 
-**Iglberger, *C++ Software Design*.** The chapters on value semantics, on ownership, and on the strategy pattern are directly relevant. The Strategy chapter is particularly useful for understanding how RAII types compose — a resource type plus its release strategy, separated cleanly. The dependency-injection chapter applies to how `RequestContext` and similar types are constructed and passed through the call graph rather than reached for via global state.
+**Iglberger, *C++ Software Design*.** The chapters on value semantics, on ownership, and on the strategy pattern are directly relevant. The Strategy chapter is particularly useful for understanding how RAII types compose: a resource type plus its release strategy, separated cleanly. The dependency-injection chapter applies to how `RequestContext` and similar types are constructed and passed through the call graph rather than reached for via global state.
 
 **Yonts, *100 C++ Mistakes and How to Avoid Them*.** The cluster of mistakes around throwing destructors, raw `new`/`delete`, manual cleanup paths, missing `noexcept` on moves, and exception safety in general directly informs the "common mistakes" section above. Useful as a code-review checklist for any handler under review.
 
@@ -350,6 +364,6 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Enberg, *Latency*.** The framing of destructor cost asymmetry as a tail-latency consideration comes from here; the book is also useful for the broader question of where deterministic cleanup matters most.
 
-**Geewax, *API Design Patterns*.** The chapter on idempotency and the chapters on standard error responses are relevant to the `std::expected` discussion above — what to return on the failing path is an API design question as much as a C++ one.
+**Geewax, *API Design Patterns*.** The chapter on idempotency and the chapters on standard error responses are relevant to the `std::expected` discussion above: what to return on the failing path is an API design question as much as a C++ one.
 
 **"Building Low Latency Applications with C++".** Background reference for the cost model of standard-library operations under load; cited more directly in [Doc 05]({{ '/docs/05-threading/' | relative_url }}) (threading) and [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) (state externalization).

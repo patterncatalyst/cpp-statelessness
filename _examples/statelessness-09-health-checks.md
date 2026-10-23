@@ -1,6 +1,6 @@
 ---
-title: "Statelessness 09 — Health checks"
-description: "The runnable companion to compendium Doc 09: a single gRPC service that demonstrates the three probes (startup, liveness, readiness), the gRPC standard health protocol, liveness and readiness on separate ports, a SIGUSR1-driven readiness toggle, and the graceful-shutdown sequence — SIGTERM to drained, ordered teardown, clean exit."
+title: "Statelessness 09: Health checks"
+description: "The runnable companion to compendium Doc 09: a single gRPC service that demonstrates the three probes (startup, liveness, readiness), the gRPC standard health protocol, liveness and readiness on separate ports, a SIGUSR1-driven readiness toggle, and the graceful-shutdown sequence: SIGTERM to drained, ordered teardown, clean exit."
 order: 210
 card_eyebrow: "Compendium · <strong>Doc 09</strong>"
 card_title: "Health checks"
@@ -12,15 +12,15 @@ demo_dir: statelessness/09-health-checks
 github_path: examples/statelessness/09-health-checks
 ---
 
-> The full source for this example lives in [`examples/statelessness/09-health-checks/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/09-health-checks) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/09-health-checks/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/09-health-checks): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 09 — Health checks]({{ '/docs/09-health-checks/' | relative_url }})
+[Doc 09: Health checks]({{ '/docs/09-health-checks/' | relative_url }})
 
 A health check is the orchestrator's API into your service. It decides
 whether to route traffic to a replica, whether to restart a sick one, and
 whether a newly-started one has finished initializing. Those are **three
-different questions** — and conflating them produces failure modes that look
+different questions**, and conflating them produces failure modes that look
 correct in development and fail in production. This example answers each
 distinctly, with one small gRPC service you can drive by hand.
 
@@ -37,10 +37,10 @@ prevent:
 - **A bad liveness probe amplifies outages.** The classic failure: a liveness
   probe that checks a downstream dependency. A transient database blip then
   trips liveness on *every* replica at once, and the orchestrator restarts the
-  whole fleet simultaneously — turning a blip into an outage. Liveness must
+  whole fleet simultaneously, turning a blip into an outage. Liveness must
   fail only for what a restart fixes.
 - **Graceful shutdown is a feature under orchestration.** Replicas are killed
-  routinely — scaling down, rolling deploys, node drains. A service that
+  routinely: scaling down, rolling deploys, node drains. A service that
   drops in-flight requests on `SIGTERM` loses work every deploy. The ordered
   drain is what makes a kill safe.
 
@@ -52,7 +52,7 @@ then flips to `SERVING`. A startup probe hitting `NOT_SERVING` gives the
 service time to come up instead of killing it during cold start.
 
 **Liveness vs readiness, on two ports.** Liveness is a tiny HTTP endpoint on
-`:8080` (`GET /healthz` → `200 ok`) — cheap, binary, and it survives gRPC
+`:8080` (`GET /healthz` → `200 ok`): cheap, binary, and it survives gRPC
 overload, so a merely-busy replica is not restarted. Readiness is the gRPC
 standard `grpc.health.v1.Health` service on `:50051`, reporting per-service
 status. This hybrid split is the recommended production shape: liveness needs
@@ -60,7 +60,7 @@ to survive overload; readiness reports the richer service-level status.
 
 **Driving readiness at runtime.** `SIGUSR1` toggles readiness between
 `SERVING` and `NOT_SERVING` *without* touching the server-wide status, so you
-can watch readiness drop — traffic would stop — while liveness stays green and
+can watch readiness drop (traffic would stop) while liveness stays green and
 the replica is never restarted. The recovery (toggle back to ready, no
 restart) is the corollary: a not-ready replica should be able to return to
 ready on its own.
@@ -81,14 +81,14 @@ cd examples/statelessness/09-health-checks
 
 The first build compiles the gRPC chain (~5 min cold); a warm Conan cache is
 far faster. The demo queries readiness with the in-image `health-probe` via
-`docker exec`, and liveness with `curl` against the published HTTP port — no
+`docker exec`, and liveness with `curl` against the published HTTP port; no
 host gRPC tooling needed.
 
 CI verification: `scripts/test-stateless-demo-09-health-checks.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Docker 29.x — staged startup,
+Representative output on a Fedora 44 host with Docker 29.x; staged startup,
 the liveness/readiness split, a SIGUSR1 readiness toggle, then graceful
 shutdown:
 
@@ -124,27 +124,27 @@ shutdown:
 - **The SIGUSR1 toggle drops readiness while liveness stays 200.** This is the
   whole liveness-vs-readiness distinction in one act: traffic stops (readiness
   `NOT_SERVING`) but the replica is *not* restarted (liveness still green).
-  Then it returns to ready on its own — no external intervention.
+  Then it returns to ready on its own, with no external intervention.
 - **The shutdown sequence is ordered, and the order matters.** Readiness drops
   *first* (so the load balancer stops sending new requests), *then* in-flight
   RPCs drain, *then* teardown. Reverse that and you'd either kill live requests
   or keep accepting new ones while shutting down.
 - **Exit code 0 is the success condition for act 3.** A clean exit means the
   drain completed within the deadline. A non-zero exit or a hang would mean
-  the shutdown sequence didn't complete — work was dropped.
+  the shutdown sequence didn't complete; work was dropped.
 
 ## Files
 
-- `proto/echo.proto` — the trivial app service (`demo.health.EchoService`)
-- `proto/health.proto` — the standard `grpc.health.v1` protocol (for the probe)
-- `src/health_svc.cpp` — the server: staged startup, liveness, readiness,
+- `proto/echo.proto`: the trivial app service (`demo.health.EchoService`)
+- `proto/health.proto`: the standard `grpc.health.v1` protocol (for the probe)
+- `src/health_svc.cpp`: the server: staged startup, liveness, readiness,
   shutdown
-- `src/health_probe.cpp` — the minimal `grpc_health_probe`, built from source
-- `CMakeLists.txt` — codegen both protos; build both binaries
-- `conanfile.py` — the gRPC trio (no other deps)
-- `Containerfile` — gRPC-trio builder; `ubi-minimal` + `curl` runtime
-- `compose.yml` — one hardened service; liveness as the healthcheck
-- `demo.sh` — the three acts
+- `src/health_probe.cpp`: the minimal `grpc_health_probe`, built from source
+- `CMakeLists.txt`: codegen both protos; build both binaries
+- `conanfile.py`: the gRPC trio (no other deps)
+- `Containerfile`: gRPC-trio builder; `ubi-minimal` + `curl` runtime
+- `compose.yml`: one hardened service; liveness as the healthcheck
+- `demo.sh`: the three acts
 
 ## Caveats and gotchas
 
@@ -155,21 +155,21 @@ shutdown:
   handler sets only a `volatile sig_atomic_t` flag while a control thread does
   the actual `SetServingStatus`/`Shutdown` work.
 - **The signal handler must be async-signal-safe.** It does nothing but set a
-  flag — it cannot call into gRPC, take a lock, or allocate, because almost
+  flag; it cannot call into gRPC, take a lock, or allocate, because almost
   nothing is async-signal-safe. A dedicated control thread watches the flag and
   performs the real work off the handler. Doing the work *in* the handler is the
   subtle bug the demo is built to avoid.
-- **Liveness must NOT check dependencies.** Liveness fails only for what a
-  restart fixes — deadlocks, internal corruption — never downstream-dependency
+- **Liveness must not check dependencies.** Liveness fails only for what a
+  restart fixes (deadlocks, internal corruption), never downstream-dependency
   health. A liveness probe that fails when the database is unreachable is how a
   single blip becomes a fleet-wide restart storm. Dependency trouble belongs in
   readiness (drain, don't kill).
 - **Keep probes cheap.** A no-op, not a real query. A probe heavier than a real
-  request makes the probe traffic itself the load — and at high replica counts
+  request makes the probe traffic itself the load, and at high replica counts
   that's significant.
 - **The probe is built hermetically.** Rather than fetch the upstream
   `grpc_health_probe` binary, the example builds its own from the standard
-  `health.proto` — no build-time network dependency, and the `Check` RPC stays
+  `health.proto`: no build-time network dependency, and the `Check` RPC stays
   visible in the source.
 
 ## Source materials
@@ -177,18 +177,18 @@ shutdown:
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Enberg, *Latency*, ch. 6** — graceful degradation and shedding load; why
+- **Enberg, *Latency*, ch. 6**: graceful degradation and shedding load; why
   readiness (drain) beats liveness (kill) for transient unhealthiness
-- **Iglberger, *C++ Software Design*, ch. 2** — the control-thread / signal-flag
+- **Iglberger, *C++ Software Design*, ch. 2**: the control-thread / signal-flag
   separation as a single-responsibility design; the handler signals, the
   controller acts
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 11** — `std::stop_token` and
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 11**: `std::stop_token` and
   `std::jthread` for the cooperative cancellation the shutdown sequence uses
 
 ## The anti-patterns it is built to avoid
 
-Liveness fails only for what a restart fixes — deadlocks, internal corruption
-— never downstream-dependency health (that path is how a single database blip
+Liveness fails only for what a restart fixes (deadlocks, internal corruption),
+never downstream-dependency health (that path is how a single database blip
 becomes a fleet-wide restart storm). Probes stay cheap, so the probe traffic
 itself never becomes load. Readiness, not liveness, is where transient
 unhealthiness and graceful drain live. Those distinctions are the whole point

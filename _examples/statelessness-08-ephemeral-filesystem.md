@@ -1,5 +1,5 @@
 ---
-title: "Statelessness 08 — Ephemeral filesystem"
+title: "Statelessness 08: Ephemeral filesystem"
 description: "The runnable companion to compendium Doc 08: a read-only container rootfs as the forcing function, spdlog's basic_logger_mt EROFS trap and the stdout-sink fix, ephemerality across container restarts, and why scratch belongs on an explicitly-mounted tmpfs."
 order: 209
 card_eyebrow: "Compendium · <strong>Doc 08</strong>"
@@ -12,10 +12,10 @@ demo_dir: statelessness/08-ephemeral-filesystem
 github_path: examples/statelessness/08-ephemeral-filesystem
 ---
 
-> The full source for this example lives in [`examples/statelessness/08-ephemeral-filesystem/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/08-ephemeral-filesystem) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/08-ephemeral-filesystem/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/08-ephemeral-filesystem): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 08 — The ephemeral filesystem trap]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})
+[Doc 08: The ephemeral filesystem trap]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})
 
 A container's filesystem is ephemeral: anything written outside an
 explicitly-mounted volume disappears on restart, and the kernel does not
@@ -30,7 +30,7 @@ The ephemeral filesystem is the constraint people forget until it bites in
 production, and statelessness depends on respecting it:
 
 - **Silent data loss is the worst kind.** A write to the container rootfs
-  *succeeds* — the bytes land on the writable overlay layer — and then
+  *succeeds*: the bytes land on the writable overlay layer, and then
   vanish on the next restart, with no error to point at. By the time you
   notice missing data, the evidence is gone.
 - **A read-only rootfs converts silence into a loud failure.** With
@@ -39,7 +39,7 @@ production, and statelessness depends on respecting it:
   in production. It's a forcing function, not a restriction.
 - **Statelessness *requires* that nothing authoritative lives on disk.** A
   replica that keeps state on its local filesystem can't be killed and
-  rescheduled freely — the orchestrator's core assumption. Persistence goes
+  rescheduled freely, the orchestrator's core assumption. Persistence goes
   to a backing store (state externalization); scratch goes to an explicit
   tmpfs; logs go to
   stdout.
@@ -54,7 +54,7 @@ common C++ container filesystem bug.
 **The fix: log to stdout.** A `stdout_color_sink_mt` with a structured
 pattern, as Doc 08 prescribes. The binary writes nothing to disk, so the
 read-only rootfs is no obstacle; the runtime captures stdout and ships it to
-Loki — no file path, no rotation, no log directory.
+Loki: no file path, no rotation, no log directory.
 
 **Ephemerality.** On a writable rootfs a file write "works," but a fresh
 container's `check-file` shows it did not survive: each container starts with
@@ -73,14 +73,14 @@ cd examples/statelessness/08-ephemeral-filesystem
 ```
 
 The build is a quick compile of one binary (spdlog + fmt via Conan). There
-is no long-running service and no ports — the demo runs the binary under
+is no long-running service and no ports; the demo runs the binary under
 several `docker run` configurations and shows the contrast.
 
 CI verification: `scripts/test-stateless-demo-08-ephemeral-filesystem.sh`.
 
 ## What you'll see
 
-Representative output on a Fedora 44 host with Docker 29.x — the file logger
+Representative output on a Fedora 44 host with Docker 29.x: the file logger
 crashing on a read-only rootfs, the stdout fix working, ephemerality across
 a restart, and scratch needing an explicit tmpfs:
 
@@ -109,59 +109,59 @@ a restart, and scratch needing an explicit tmpfs:
 
 - **Act 1 is *supposed* to crash.** The `EROFS` + `spdlog_ex` + exit 134 is
   the trap firing exactly as intended. On a writable rootfs this would have
-  "worked" and then silently lost the logs on restart — which is worse.
+  "worked" and then silently lost the logs on restart, which is worse.
 - **Act 2 exits clean because it touches no disk.** Logging to stdout means
   the read-only rootfs is irrelevant; the platform's collector owns
   persistence. That's also what 12-factor's Logs factor wants.
 - **Act 3 is the silent-loss demonstration.** The write to `/data` succeeds
-  in container A, but container B — a fresh start — can't find it. Nothing
+  in container A, but container B (a fresh start) can't find it. Nothing
   errored; the data simply never persisted past the overlay layer.
 - **Act 4 shows scratch needs an explicit home.** A read-only rootfs blocks
   `/tmp` writes until you mount a tmpfs there. `--tmpfs /tmp` makes scratch
-  work, RAM-backed and recycled — the correct place for transient files.
+  work, RAM-backed and recycled: the correct place for transient files.
 
 ## Files
 
-- `src/app.cpp` — the `log-stdout` / `log-file` / `check-file` / `scratch`
+- `src/app.cpp`: the `log-stdout` / `log-file` / `check-file` / `scratch`
   modes
-- `CMakeLists.txt` — one binary, spdlog
-- `conanfile.py` — spdlog/1.14.1 (pulls fmt; both static)
-- `Containerfile` — UBI 10 builder; ubi-minimal runtime + libstdc++
-- `demo.sh` — runs the binary under `--read-only` / `--tmpfs`
+- `CMakeLists.txt`: one binary, spdlog
+- `conanfile.py`: spdlog/1.14.1 (pulls fmt; both static)
+- `Containerfile`: UBI 10 builder; ubi-minimal runtime + libstdc++
+- `demo.sh`: runs the binary under `--read-only` / `--tmpfs`
 
 ## Caveats and gotchas
 
 - **`basic_logger_mt` opens the file in its constructor.** The throw happens
-  at logger construction, before your service does any work — which is why
+  at logger construction, before your service does any work, which is why
   it crashes at startup rather than at first log line. Prefer the stdout
   sink in a container, always.
 - **Docker's `--read-only` never auto-mounts a tmpfs anywhere.** Unlike
-  Podman — whose `--read-only-tmpfs` default auto-mounts `/tmp`, `/run`, and
-  `/var/tmp` under `--read-only` — Docker leaves every path read-only with no
+  Podman (whose `--read-only-tmpfs` default auto-mounts `/tmp`, `/run`, and
+  `/var/tmp` under `--read-only`), Docker leaves every path read-only with no
   exceptions, so scratch space always needs an explicit `--tmpfs`. Act 4 shows
   this directly: the bare `--read-only` run fails, and only the explicit
   `--tmpfs /tmp` run succeeds.
 - **Mount scratch tmpfs explicitly in production.** Relying on the auto-mount
   is fragile; an explicit compose `tmpfs:` / Kubernetes `emptyDir` with
-  `medium: Memory` is portable and visible. And size it — a tmpfs counts
+  `medium: Memory` is portable and visible. And size it: a tmpfs counts
   against the memory cgroup.
 - **A "successful" write on a writable rootfs is the dangerous case.** If
   your rootfs is writable, accidental writes succeed and then vanish on
   restart with no error. That's exactly why `read_only: true` is the
-  recommended default — it turns the silent failure into a loud one.
+  recommended default: it turns the silent failure into a loud one.
 
 ## Source materials
 
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 2** — RAII over file
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 2**: RAII over file
   handles and why resource acquisition (here, opening a log file) happens in
   a constructor that can fail
-- **Iglberger, *C++ Software Design*, ch. 2** — the sink abstraction in
+- **Iglberger, *C++ Software Design*, ch. 2**: the sink abstraction in
   spdlog as a strategy; swapping a file sink for a stdout sink without
   touching call sites
-- **Enberg, *Latency*, ch. 2** — why disk I/O on the request path (file
+- **Enberg, *Latency*, ch. 2**: why disk I/O on the request path (file
   logging, rotation) is a latency source a stateless service should avoid
 
 ## How it relates to the rest
@@ -171,7 +171,7 @@ The gRPC examples in this set
 [03]({{ '/examples/statelessness-03-pmr/' | relative_url }}),
 [04]({{ '/examples/statelessness-04-process-scoped-state/' | relative_url }}),
 [07]({{ '/examples/statelessness-07-state-externalization/' | relative_url }}))
-already run with `read_only: true` and an explicit `tmpfs: [/tmp]` — they
+already run with `read_only: true` and an explicit `tmpfs: [/tmp]`; they
 are the services that got the audit right. This example is the *why*: it
 shows the failure those settings prevent. Persistence that must survive a
-restart goes to a backing store — see [state externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }}) — never the container layer.
+restart goes to a backing store (see [state externalization]({{ '/examples/statelessness-07-state-externalization/' | relative_url }})), never the container layer.
