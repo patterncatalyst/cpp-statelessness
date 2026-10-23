@@ -1,5 +1,5 @@
 ---
-title: "Statelessness 05 — Threading & CPU budget"
+title: "Statelessness 05: Threading & CPU budget"
 description: "The runnable companion to compendium Doc 05: hardware_concurrency() lies under a cgroup CPU quota. A cgroup-aware probe and a pool-size sweep under --cpus=2 show that oversubscription buys no throughput and wrecks tail latency through CFS throttling."
 order: 205
 card_eyebrow: "Compendium · <strong>Doc 05</strong>"
@@ -12,18 +12,18 @@ demo_dir: statelessness/05-threading
 github_path: examples/statelessness/05-threading
 ---
 
-> The full source for this example lives in [`examples/statelessness/05-threading/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/05-threading) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/05-threading/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/05-threading): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 05 — Threading under container limits]({{ '/docs/05-threading/' | relative_url }})
+[Doc 05: Threading under container limits]({{ '/docs/05-threading/' | relative_url }})
 
 The one-line takeaway: **`std::thread::hardware_concurrency()` lies under a
-cgroup CPU limit** — it reports the host's core count, not your container's
+cgroup CPU limit**: it reports the host's core count, not your container's
 quota. Size a pool from it on a quota-limited container and you oversubscribe
 the CPU: more threads fighting over the same fixed slice of CFS quota, with
-throttling pauses spread across more threads — worse tail latency, no extra
+throttling pauses spread across more threads: worse tail latency, no extra
 throughput. This is the first compendium example with **no gRPC and no
-Conan** — two small standard-library binaries that build in seconds.
+Conan**: two small standard-library binaries that build in seconds.
 
 ## Why this matters
 
@@ -38,11 +38,11 @@ obvious source of truth is the wrong one:
   the kernel in a way that hurts.
 - **CFS throttling is a tail-latency event, not a throughput one.** When the
   cgroup exhausts its CPU quota mid-period, the scheduler throttles *every*
-  thread in the cgroup until the next period boundary — up to ~100 ms with
+  thread in the cgroup until the next period boundary, up to ~100 ms with
   the default period. Average throughput barely moves; p99 and max latency
   spike. Tail latency is the SLO that breaks first.
 - **It's the same lie everywhere.** The host-probe default isn't unique to
-  your thread pool — gRPC's sync server, glibc/jemalloc malloc arenas,
+  your thread pool: gRPC's sync server, glibc/jemalloc malloc arenas,
   OpenMP, TBB, and the C++ parallel algorithms all size themselves from the
   host by default. Get the cgroup reading right once and you can fix all of
   them.
@@ -52,7 +52,7 @@ obvious source of truth is the wrong one:
 **`cpu-probe`** reads the truth from `/sys/fs/cgroup/cpu.max` (cgroup v2,
 with a v1 fallback) and prints it next to `hardware_concurrency()` and the
 pool size you should actually use. Inside `--cpus=2`, the host probe is
-unchanged but the cgroup quota — and the recommendation — drops to 2.
+unchanged but the cgroup quota (and the recommendation) drops to 2.
 
 **`pool-bench`** runs a fixed CPU-bound workload across a pool of a given
 size and reports throughput and per-task latency percentiles. The demo runs
@@ -70,11 +70,11 @@ cd examples/statelessness/05-threading
 ./demo.sh --clean    # remove the image
 ```
 
-No Conan, no gRPC — two standard-library binaries that build in seconds.
+No Conan, no gRPC: two standard-library binaries that build in seconds.
 
 CI verification: `scripts/test-stateless-demo-05-threading.sh`.
 
-`--cpus` is enforced directly by a standard rootful Docker daemon — no
+`--cpus` is enforced directly by a standard rootful Docker daemon, no
 delegation needed. It only depends on cgroup v2 `cpu`-controller delegation
 to your user slice if you're running a rootless engine (rootless Docker or
 Podman); the demo detects that case and points you at
@@ -104,30 +104,30 @@ GCC 14 and rootful Docker 29.x, running the container under `--cpus=2`:
   `hardware_concurrency()` reports 22; the cgroup quota is 2. A pool sized to
   22 is an 11× oversubscription against the real budget.
 - **Throughput plateaus at the quota (pool=2).** Going from 1 to 2 threads
-  roughly doubles throughput — you're using both cores in your budget. Going
+  roughly doubles throughput: you're using both cores in your budget. Going
   from 2 to 4 to 8 buys *nothing*: there are still only 2 cores' worth of
   quota to spend.
 - **p99 and max explode past the quota.** That's the whole lesson. At pool=8,
-  max latency hits ~104 ms — almost exactly the default CFS period — because
+  max latency hits ~104 ms (almost exactly the default CFS period) because
   a task can be throttled for a full period when the cgroup runs out of quota
   mid-window. The mean barely moved; the tail fell off a cliff.
 - **If the tails *don't* climb past pool=2**, your `--cpus` isn't being
-  enforced — see the delegation caveat below. On rootful Docker this would be
+  enforced: see the delegation caveat below. On rootful Docker this would be
   unusual; on a rootless engine it means the cgroup `cpu` controller isn't
   delegated to your user slice.
 
 ## Files
 
-- `src/cgroup_cpu.hpp` — reads `cpu.max` (v2) / `cfs_quota_us` (v1) and
+- `src/cgroup_cpu.hpp`: reads `cpu.max` (v2) / `cfs_quota_us` (v1) and
   recommends a pool size from the quota
-- `src/cpu_probe.cpp` — prints `hardware_concurrency()` next to the cgroup
+- `src/cpu_probe.cpp`: prints `hardware_concurrency()` next to the cgroup
   quota and the recommendation
-- `src/pool_bench.cpp` — a CPU-bound workload across a sized pool, with
+- `src/pool_bench.cpp`: a CPU-bound workload across a sized pool, with
   latency percentiles
-- `CMakeLists.txt` — two binaries; no external dependencies
-- `Containerfile` — UBI 10 (base gcc/gcc-c++ + cmake) → `ubi-minimal`; no
+- `CMakeLists.txt`: two binaries; no external dependencies
+- `Containerfile`: UBI 10 (base gcc/gcc-c++ + cmake) → `ubi-minimal`; no
   Conan, no gRPC
-- `demo.sh` — the driver (`docker run --cpus`)
+- `demo.sh`: the driver (`docker run --cpus`)
 
 ## Caveats and gotchas
 
@@ -135,17 +135,17 @@ GCC 14 and rootful Docker 29.x, running the container under `--cpus=2`:
   rootful Docker daemon enforces a real CFS quota directly. Running rootless
   (rootless Docker, or Podman's rootless default) needs the cgroup v2 `cpu`
   controller delegated to your user slice first; without it, the flag is
-  accepted but not enforced and the throttling effect is muted — the tails
+  accepted but not enforced and the throttling effect is muted: the tails
   won't climb. Enable it with `scripts/cgroup-delegation.sh enable`, then
   re-login.
 - **The throttle window is the CFS period (~100 ms).** The max-latency
   number tracks the default `cpu.cfs_period_us`. Shortening the period
   reduces individual stalls but raises scheduling overhead; it's rarely the
-  right fix — sizing the pool is.
+  right fix; sizing the pool is.
 - **The bench is CPU-bound by design.** For an I/O-bound handler the math is
   different: threads blocked on I/O don't consume quota, so a larger pool can
   help. The lesson is "size from the cgroup," not "always use exactly the
-  core count" — match the pool to the workload *and* the budget.
+  core count": match the pool to the workload *and* the budget.
 - **The same lie reaches pools you didn't write.** See "Beyond your own
   pools" below; sizing your own pool correctly is necessary but not
   sufficient.
@@ -155,20 +155,20 @@ GCC 14 and rootful Docker 29.x, running the container under `--cpus=2`:
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 11** — concurrency and
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 11**: concurrency and
   parallelism in C++; thread pools, oversubscription, and the cost model
   behind the sweep
-- **Enberg, *Latency*, ch. 3** — scheduling and the tail; why throttling
+- **Enberg, *Latency*, ch. 3**: scheduling and the tail; why throttling
   shows up as p99/max spikes rather than lower mean throughput
-- **Iglberger, *C++ Software Design*, ch. 2** — the case for owning the pool
+- **Iglberger, *C++ Software Design*, ch. 2**: the case for owning the pool
   in the composition root and injecting it, rather than reaching for a global
   thread pool sized at static-init time
 
 ## Beyond your own pools
 
-The same lie reaches pools you didn't write — gRPC's sync server
+The same lie reaches pools you didn't write: gRPC's sync server
 (`ResourceQuota::SetMaxThreads`), glibc malloc arenas (`MALLOC_ARENA_MAX`,
-whose default is `8 × NPROCS` from the host probe — catastrophic on a big
+whose default is `8 × NPROCS` from the host probe, which is catastrophic on a big
 host with a small quota), jemalloc (`MALLOC_CONF=narenas:…`, or
 `narenas:auto` on recent versions which reads the cgroup), OpenMP, TBB, and
 the C++ parallel algorithms all probe the host by default. Size them from the
@@ -180,7 +180,7 @@ details.
 
 The `unsynchronized` choice in the
 [PMR arena]({{ '/examples/statelessness-03-pmr/' | relative_url }}) is
-justified by the threading model here — one thread per request arena. The
+justified by the threading model here: one thread per request arena. The
 cgroup-aware pool sizing this example demonstrates is exactly what
 [process-scoped state]({{ '/docs/04-process-scoped-state/' | relative_url }})
 uses to size its pools, and what the end-to-end example

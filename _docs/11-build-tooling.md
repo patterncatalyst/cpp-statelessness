@@ -7,11 +7,25 @@ sectionid: docs
 part: integration-tooling
 ---
 
-# 11 — Build Tooling Appendix: Conan, CMake, Toolchain
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Set up a `conanfile.py` with version-pinned dependencies and separate dev/release profiles
+- Enable AddressSanitizer in development and LTO plus hardening flags in release builds
+- Structure a CMake project with proto codegen, vendored helper libraries, and a test target
+- Check C++23 feature availability against a specific GCC or Clang version before relying on it
+- Build a multi-stage Containerfile that matches the Kubernetes `runAsUser` and ships `grpc_health_probe`
+
+## Why this matters
+
+A service that gets every architectural pattern right still fails to build reproducibly, or builds with the wrong flags, when the toolchain setup is ad hoc. Mismatched protobuf versions across transitive dependencies produce linker errors that look unrelated to the actual problem; a missing AddressSanitizer flag in the dev profile lets an arena lifetime bug or a `co_await`-across-lock bug ship to production instead of failing a local test run; an LTO flag with no matching plugin silently produces an unoptimized binary.
+
+None of these failures announce themselves at the point of the mistake. They surface later, as a flaky CI run, an unexplained performance regression, or a crash that only reproduces under load. Pinning the Conan setup, the compiler version, and the Containerfile pattern once, and reusing it across services, removes an entire class of toolchain-induced bugs before they can occur.
 
 ## Thesis
 
-The earlier documents assumed a Conan + CMake + Ninja + GCC-or-Clang build environment. This appendix covers the specifics — which libraries to pull in, what versions, what compiler flags, how to wire the multi-stage container build, and full source for the small vendored helpers that earlier docs referenced. The treatment is reference-style; the goal is that a service team can use this as a checklist to set up a new C++ gRPC service in this stack.
+The earlier documents assumed a Conan + CMake + Ninja + GCC-or-Clang build environment. This appendix covers the specifics: which libraries to pull in, what versions, what compiler flags, how to wire the multi-stage container build, and full source for the small vendored helpers that earlier docs referenced. The treatment is reference-style; the goal is that a service team can use this as a checklist to set up a new C++ gRPC service in this stack.
 
 The toolchain landscape moves quickly. C++23 features that were partial a year ago are landed; features that just landed need newer compiler versions than long-term-support distributions ship. This document calls out specific GCC and Clang versions where the feature dependency matters. Beyond that, the patterns are stable: Conan 2.x for dependencies, CMake 3.27+ for build configuration, Ninja as the generator, multi-stage Dockerfile or Containerfile for the image build, GCC 14+ for libstdc++'s C++23 support.
 
@@ -19,7 +33,7 @@ The toolchain landscape moves quickly. C++23 features that were partial a year a
 
 > **Run the helpers.** This document is a reference appendix, not a service,
 > so its runnable companion is a focused slice: the two self-contained
-> vendored helpers below — `cgroup_helper` and `psi_reader` — built as
+> vendored helpers below, `cgroup_helper` and `psi_reader`, built as
 > static libraries, unit-tested with GoogleTest over their pure parsers, and
 > exercised by a binary you run under different cgroup caps. It lives at
 > [`examples/statelessness/11-build-tooling/`]({{ '/examples/statelessness-11-build-tooling/' | relative_url }});
@@ -87,9 +101,9 @@ class PricingService(ConanFile):
         deps.generate()
 ```
 
-The version pins are concrete; bumping them is a deliberate operation, tested in CI. The `default_options` flags select the relevant features — gRPC's protoc plugin for code generation, OTLP-over-gRPC for the OpenTelemetry exporter, Boost without Python (we don't need it), static Boost to keep the binary self-contained.
+The version pins are concrete; bumping them is a deliberate operation, tested in CI. The `default_options` flags select the relevant features: gRPC's protoc plugin for code generation, OTLP-over-gRPC for the OpenTelemetry exporter, Boost without Python (we don't need it), static Boost to keep the binary self-contained.
 
-Two Conan profiles are useful — one for development (debug symbols, sanitizers, fast incremental rebuilds) and one for production builds (optimized, LTO, hardening flags):
+Two Conan profiles are useful: one for development (debug symbols, sanitizers, fast incremental rebuilds) and one for production builds (optimized, LTO, hardening flags):
 
 ```ini
 # ~/.conan2/profiles/dev
@@ -138,7 +152,7 @@ tools.build:linkflags=[
 ]
 ```
 
-The dev profile turns on AddressSanitizer for development builds — catches arena lifetime bugs ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), the locks-across-`co_await` UB ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), and most of the resource-leak patterns. The release profile enables LTO and the standard set of hardening flags. `-fvisibility=hidden` reduces dynamic symbol table size, which helps both startup time ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})) and security surface.
+The dev profile turns on AddressSanitizer for development builds, catching arena lifetime bugs ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), the locks-across-`co_await` UB ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), and most of the resource-leak patterns. The release profile enables LTO and the standard set of hardening flags. `-fvisibility=hidden` reduces dynamic symbol table size, which helps both startup time ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})) and security surface.
 
 Invoking Conan:
 
@@ -152,7 +166,7 @@ The Conan-generated CMake presets (in `CMakeUserPresets.json`) wire the toolchai
 
 ## Library inventory
 
-Brief notes on each library — what it's for, what version is current, what to watch for.
+Brief notes on each library: what it's for, what version is current, what to watch for.
 
 **grpc + protobuf** are the canonical pair for gRPC C++. `grpc/1.65.0` (mid-2024) onward has solid callback API support. The `cpp_plugin` option enables `protoc-gen-cpp` for `.proto` compilation. The Conan recipe builds protobuf as a transitive dependency at a compatible version; trying to mix Conan-built and system-built protobuf typically ends badly.
 
@@ -300,7 +314,7 @@ target_compile_options(pricing_service PRIVATE
 install(TARGETS pricing_service RUNTIME DESTINATION bin)
 ```
 
-The vendored helper subdirectories are small `OBJECT` or `STATIC` libraries that hold the cgroup reader, PSI parser, and OTel propagator — their full source is below.
+The vendored helper subdirectories are small `OBJECT` or `STATIC` libraries that hold the cgroup reader, PSI parser, and OTel propagator; their full source is below.
 
 ## Toolchain and C++23 feature support
 
@@ -318,7 +332,7 @@ The compiler version controls which C++23 features are available. The table belo
 | `constinit` | [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) | 10+ (C++20) | 11+ (C++20) |
 | Designated initializers | [Doc 03]({{ '/docs/03-pmr/' | relative_url }}) | 8+ (C++20) | 10+ (C++20) |
 
-For services that need `std::flat_map` today and don't have GCC 15+, the fallback is Abseil's `absl::flat_hash_map` (different semantics — hash table, not sorted) or `absl::btree_map` (sorted, b-tree, similar cache behaviour to `flat_map`). Both are stable and well-tested.
+For services that need `std::flat_map` today and don't have GCC 15+, the fallback is Abseil's `absl::flat_hash_map` (different semantics: hash table, not sorted) or `absl::btree_map` (sorted, b-tree, similar cache behaviour to `flat_map`). Both are stable and well-tested.
 
 For services that need `<stacktrace>`, the link flag matters: GCC 14 ships `libstdc++_libbacktrace` as a separate static library that must be explicitly linked. Conan's CMake integration handles this when the standard library detects the feature, but it's worth knowing about for debugging "undefined reference to `std::stacktrace::...`" linker errors.
 
@@ -392,7 +406,7 @@ EXPOSE 50051
 ENTRYPOINT ["/usr/local/bin/pricing_service"]
 ```
 
-A few choices to call out. The build stage uses the full Fedora image; the runtime stage uses `fedora-minimal` which is much smaller. The binary is stripped after build to remove debug symbols (production debugging uses separate symbol files shipped to a symbol server, not symbols in the running image). `grpc_health_probe` comes from the gRPC ecosystem's prebuilt binary release — adding a few MB to the image, far less than building it from source.
+A few choices to call out. The build stage uses the full Fedora image; the runtime stage uses `fedora-minimal` which is much smaller. The binary is stripped after build to remove debug symbols (production debugging uses separate symbol files shipped to a symbol server, not symbols in the running image). `grpc_health_probe` comes from the gRPC ecosystem's prebuilt binary release, adding a few MB to the image, far less than building it from source.
 
 The `USER 1000` directive matches the `runAsUser: 1000` from the Kubernetes manifest in [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}). Running as a non-root UID inside the container is independent of the rootless-Docker story ([Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})) but layers on the same defense-in-depth.
 
@@ -522,7 +536,7 @@ target_include_directories(cgroup_helper PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### `vendor/psi_reader/`
 
-The PSI parser from [Doc 05]({{ '/docs/05-threading/' | relative_url }})'s sidebar. Brief because it's straightforward — read the file, parse three `avgN=X.XX` fields:
+The PSI parser from [Doc 05]({{ '/docs/05-threading/' | relative_url }})'s sidebar. Brief because it's straightforward: read the file, parse three `avgN=X.XX` fields:
 
 ```cpp
 // psi_reader.h
@@ -649,9 +663,9 @@ include(GoogleTest)
 gtest_discover_tests(unit_tests)
 ```
 
-For backing-service-dependent tests (PgPool, Redis access), the standard pattern is to spin up the dependency in a sidecar container during the test run — testcontainers-cpp is the C++ equivalent of the Java testcontainers library and integrates with Conan via its own recipe. Alternatively, run the test container under Docker Compose and have the test binary connect to it.
+For backing-service-dependent tests (PgPool, Redis access), the standard pattern is to spin up the dependency in a sidecar container during the test run. testcontainers-cpp is the C++ equivalent of the Java testcontainers library and integrates with Conan via its own recipe. Alternatively, run the test container under Docker Compose and have the test binary connect to it.
 
-For unit tests of pure C++ code — the `RequestContext` lifecycle, `ChannelCache` insertion logic, idempotency key handling — GoogleTest is sufficient on its own. Mock the gRPC and backing-service interfaces at the seam, test the logic in isolation.
+For unit tests of pure C++ code (the `RequestContext` lifecycle, `ChannelCache` insertion logic, idempotency key handling), GoogleTest is sufficient on its own. Mock the gRPC and backing-service interfaces at the seam, test the logic in isolation.
 
 ## Common gotchas
 
@@ -667,7 +681,7 @@ GCC's libstdc++ ABI changed in GCC 5 (the "dual ABI" transition). Conan profiles
 
 `-fvisibility=hidden` interacts with shared-library boundaries; for templates that need to be instantiated across translation units (gRPC's generated code, protobuf's reflection types), explicit `__attribute__((visibility("default")))` may be required on a small number of symbols. The Conan recipes for grpc and protobuf handle this internally; user code rarely needs to.
 
-The Containerfile multi-stage pattern requires the build stage and runtime stage to use compatible glibc versions. Building on Fedora 40 (glibc 2.39) and running on Fedora 38 (glibc 2.37) usually works because of glibc's backward compatibility, but the reverse — building on an older glibc, running on a newer one — is fine, and building on a newer glibc, running on an older one — may produce missing-symbol errors at startup. Default to building and running on the same major distro release.
+The Containerfile multi-stage pattern requires the build stage and runtime stage to use compatible glibc versions. Building on Fedora 40 (glibc 2.39) and running on Fedora 38 (glibc 2.37) usually works because of glibc's backward compatibility. The reverse (building on an older glibc, running on a newer one) is fine; building on a newer glibc and running on an older one may produce missing-symbol errors at startup. Default to building and running on the same major distro release.
 
 ## Recommendation summary
 
@@ -724,4 +738,4 @@ _The works below are collected, with reading guidance and a cross-reference matr
 
 **Google's "Software Engineering at Google" (Winters, Manshreck, Wright).** Not directly about C++ build tooling, but the chapters on dependency management and on build systems frame the Conan-vs-system-packages tradeoffs that this document operationalizes.
 
-**Iglberger, *C++ Software Design*.** The chapters on the build system and on physical architecture inform the CMake structure shown above — header organization, library boundaries, public-vs-private dependencies via CMake's `PUBLIC`/`PRIVATE` keywords.
+**Iglberger, *C++ Software Design*.** The chapters on the build system and on physical architecture inform the CMake structure shown above: header organization, library boundaries, public-vs-private dependencies via CMake's `PUBLIC`/`PRIVATE` keywords.

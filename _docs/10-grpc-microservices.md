@@ -7,13 +7,27 @@ sectionid: docs
 part: integration-tooling
 ---
 
-# 10 — Microservices with gRPC and C++
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Compose RAII, PMR, process-scoped state, threading, externalization, ephemeral-filesystem, and health-check patterns into a single running service
+- Wire a `Config` struct and `RequestContext` that pass explicit dependencies instead of reaching for globals
+- Propagate deadlines and idempotency keys across PostgreSQL, Redis, and an outbound gRPC call
+- Write a `main()` that sequences logging, tracing, process-scoped state, health status, and graceful shutdown in the right order
+- Translate the design into both a `compose.yaml` and a Kubernetes Deployment manifest
+
+## Why this matters
+
+Every pattern in the prior nine documents is correct in isolation and still fails to add up to a working service if the composition is wrong: a process-scoped channel cache built after the health check flips to `SERVING`, a `RequestContext` destroyed before its span flushes, a `main()` that orders its steps by convenience rather than by dependency. These interactions surface only once the pieces are wired together, which a document-by-document reading never forces.
+
+This chapter is the forcing function. It takes a plausible service, an order-pricing endpoint with a real database, a real cache, and a real downstream RPC, and shows every piece in its place: construction order, request-scope lifetime, deadline budget, and shutdown sequence, all in one `main()`. The result is the template a new gRPC service in this stack starts from, not a new design to invent each time.
 
 ## Thesis
 
-This is the integration document. The prior nine established patterns in isolation: RAII for request scope ([Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }})), PMR arenas for per-request allocation ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), process-scoped state owned in `main()` ([Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }})), threading model ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), 12-factor adaptation ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})), state externalization ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})), ephemeral filesystem ([Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), health checks and shutdown ([Doc 09 (health checks)]({{ '/docs/09-health-checks/' | relative_url }})). This document shows them composed in a realistic gRPC service — a small but plausible "order pricing" service that exercises every prior pattern in a single end-to-end implementation.
+This is the integration document. The prior nine established patterns in isolation: RAII for request scope ([Doc 02 (RAII)]({{ '/docs/02-raii/' | relative_url }})), PMR arenas for per-request allocation ([Doc 03 (PMR)]({{ '/docs/03-pmr/' | relative_url }})), process-scoped state owned in `main()` ([Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }})), threading model ([Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})), 12-factor adaptation ([Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})), state externalization ([Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})), ephemeral filesystem ([Doc 08 (ephemeral filesystem)]({{ '/docs/08-ephemeral-filesystem/' | relative_url }})), health checks and shutdown ([Doc 09 (health checks)]({{ '/docs/09-health-checks/' | relative_url }})). This document shows them composed in a realistic gRPC service: a small but plausible "order pricing" service that exercises every prior pattern in a single end-to-end implementation.
 
-The shape: a service proto, a `Config` struct, a `RequestContext` type, a process-scoped wiring in `main()`, a handler that touches PostgreSQL, Redis, and an upstream gRPC service, the health-check and graceful-shutdown sequence, and a deployment wrapper in both `compose.yaml` and Kubernetes manifest form. The code is C++20-portable; C++23 features called out where they meaningfully help. The implementations are sketches — production code adds more error handling and instrumentation — but they're complete enough that the composition is visible.
+The shape: a service proto, a `Config` struct, a `RequestContext` type, a process-scoped wiring in `main()`, a handler that touches PostgreSQL, Redis, and an upstream gRPC service, the health-check and graceful-shutdown sequence, and a deployment wrapper in both `compose.yaml` and Kubernetes manifest form. The code is C++20-portable; C++23 features called out where they meaningfully help. The implementations are sketches (production code adds more error handling and instrumentation) but they're complete enough that the composition is visible.
 
 This document is heavier on code than the others by design. The point is to make the integration concrete, not to develop new ideas. Each block points back to the document that develops its pattern in detail.
 
@@ -29,17 +43,17 @@ This document is heavier on code than the others by design. The point is to make
 > document presents the *full* design, including the OpenTelemetry tracing
 > pipeline. The runnable companion stays on this tutorial's verified stack
 > and so represents some of that design as documented seams rather than
-> built dependencies — it is faithful in architecture, leaner in
+> built dependencies: it is faithful in architecture, leaner in
 > dependencies:
 >
-> - **OpenTelemetry / tracing:** the companion emits **no spans** — there is
+> - **OpenTelemetry / tracing:** the companion emits **no spans**: there is
 >   no `TracerProvider`, no exporter, no OTLP endpoint, and nothing reaches
 >   Tempo. The `RequestContext` span/scope shown below is present in the
 >   companion as a commented insertion point; the PMR arena, deadline, and
 >   correlation id around it are real. The `propagate_trace_context` call in
 >   `compute_tax` is likewise a seam.
 > - **PostgreSQL:** via **libpq**, not libpqxx (libpqxx's bundled CMake
->   breaks this toolchain — gotcha G-67); the connection-pool pattern is
+>   breaks this toolchain, gotcha G-67); the connection-pool pattern is
 >   identical.
 > - **Redis:** the companion's price lookup goes **straight to PostgreSQL**;
 >   the Redis cache-aside is marked as a seam where a `GET` would slot in.
@@ -48,7 +62,7 @@ This document is heavier on code than the others by design. The point is to make
 >   migration is mechanical ([Doc 05]({{ '/docs/05-threading/' | relative_url }})).
 >
 > So when the code below constructs a span, injects trace context, or reads
-> from Redis, read it as *the design* — the companion proves the
+> from Redis, read it as *the design*: the companion proves the
 > composition (request/process/external scope, deadline propagation,
 > idempotency, lifecycle), not the telemetry. Wiring real OpenTelemetry to
 > Tempo is a deliberate add-on, not something the companion silently does.
@@ -57,7 +71,7 @@ This document is heavier on code than the others by design. The point is to make
 
 {% include excalidraw.html name="08-deadline-budget-flow" caption="Deadline budget propagation through the end-to-end example: the inbound deadline is spent across the PostgreSQL lookups and the outbound tax-service gRPC call, each budgeting against the time remaining." %}
 
-Take an order-pricing service. It accepts an order specification — customer ID and a list of line items — looks up customer metadata from PostgreSQL, fetches product prices from Redis (with cache-miss falling through to PostgreSQL), calls a tax-calculation service via gRPC, and returns a fully priced order. It supports idempotency via a client-supplied key, propagates deadlines through every downstream call, and exposes the standard gRPC health protocol.
+Take an order-pricing service. It accepts an order specification (customer ID and a list of line items), looks up customer metadata from PostgreSQL, fetches product prices from Redis (with cache-miss falling through to PostgreSQL), calls a tax-calculation service via gRPC, and returns a fully priced order. It supports idempotency via a client-supplied key, propagates deadlines through every downstream call, and exposes the standard gRPC health protocol.
 
 The proto:
 
@@ -180,9 +194,9 @@ private:
 ```
 {% endraw %}
 
-The destruction order — scope first, span second, pool third, monotonic resource fourth — falls out of the member declaration order in reverse. The arena's no-op `do_deallocate` ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})) means destroying the per-request `pmr::vector`s and `pmr::string`s inside the handler is essentially free; only the final monotonic-resource destruction reclaims the buffer.
+The destruction order (scope first, span second, pool third, monotonic resource fourth) falls out of the member declaration order in reverse. The arena's no-op `do_deallocate` ([Doc 03]({{ '/docs/03-pmr/' | relative_url }})) means destroying the per-request `pmr::vector`s and `pmr::string`s inside the handler is essentially free; only the final monotonic-resource destruction reclaims the buffer.
 
-The OTel `Scope` is the TLS guard from [Doc 05]({{ '/docs/05-threading/' | relative_url }}) — constructing it makes the span active on the current thread, destructing it restores the prior active span. As long as the handler doesn't `co_await` (this example is synchronous), the active-span TLS is consistent throughout.
+The OTel `Scope` is the TLS guard from [Doc 05]({{ '/docs/05-threading/' | relative_url }}): constructing it makes the span active on the current thread, destructing it restores the prior active span. As long as the handler doesn't `co_await` (this example is synchronous), the active-span TLS is consistent throughout.
 
 ## Process-scoped state
 
@@ -281,7 +295,7 @@ grpc::ServerUnaryReactor* PricingService::PriceOrder(
 }
 ```
 
-Two things to notice. First, the `try`/`catch` is for error-to-status translation, not for resource cleanup — all resource cleanup happens through RAII ([Doc 02]({{ '/docs/02-raii/' | relative_url }})). Second, the helper functions throw `grpc::Status` for protocol-level errors (deadline exceeded, unavailable) and `std::exception` for programming errors. The boundary translates both to the right wire-level status; the destructors run regardless.
+Two things to notice. First, the `try`/`catch` is for error-to-status translation, not for resource cleanup: all resource cleanup happens through RAII ([Doc 02]({{ '/docs/02-raii/' | relative_url }})). Second, the helper functions throw `grpc::Status` for protocol-level errors (deadline exceeded, unavailable) and `std::exception` for programming errors. The boundary translates both to the right wire-level status; the destructors run regardless.
 
 ## Helper: PostgreSQL access with deadline
 
@@ -327,7 +341,7 @@ Customer PricingService::fetch_customer(
 }
 ```
 
-The pattern from [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) is intact: deadline-based `statement_timeout`, `invalidate()` on broken connection, return-to-pool on the normal path or on SQL-error. The customer `struct` returned is a regular C++ value type — owned by the caller, lifetime separate from the connection.
+The pattern from [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) is intact: deadline-based `statement_timeout`, `invalidate()` on broken connection, return-to-pool on the normal path or on SQL-error. The customer `struct` returned is a regular C++ value type, owned by the caller, with a lifetime separate from the connection.
 
 ## Helper: outbound gRPC with deadline and context propagation
 
@@ -367,7 +381,7 @@ std::int64_t PricingService::compute_tax(
 ```
 {% endraw %}
 
-The trace context propagation — `propagate_trace_context` — uses the OTel C++ SDK's metadata-injection helper to attach the current span's W3C TraceContext headers to the outbound RPC. The tax service sees them, links its own span to the caller's, and the trace is connected end-to-end. This is the OTel side of the per-request span the `RequestContext` constructs.
+The trace context propagation (`propagate_trace_context`) uses the OTel C++ SDK's metadata-injection helper to attach the current span's W3C TraceContext headers to the outbound RPC. The tax service sees them, links its own span to the caller's, and the trace is connected end-to-end. This is the OTel side of the per-request span the `RequestContext` constructs.
 
 The channel comes from the process-scoped cache. Stub construction off the channel is cheap (a few hundred nanoseconds); the channel itself is the expensive process-scoped object that has been reused across thousands of RPCs.
 
@@ -375,7 +389,7 @@ The channel comes from the process-scoped cache. Stub construction off the chann
 
 The handler shown above is synchronous-style: blocking `acquire()` on the PG pool, blocking `stub->CalculateTax()` on the outbound gRPC. Under the callback API ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), this means each in-flight `PriceOrder` occupies a gRPC thread for its full duration. For low-to-medium fan-in, this is acceptable; size the gRPC thread pool with headroom ([Doc 05]({{ '/docs/05-threading/' | relative_url }})'s pattern), and the service handles the expected load comfortably.
 
-For higher fan-in, the same handler logic converts to coroutines via asio-grpc. The handler becomes an `asio::awaitable`; `pg_pool_.acquire_async()` and `stub->CalculateTax_async()` `co_await` their completion; the gRPC thread pool serves more concurrent calls because none are blocked on I/O. The TLS-across-`co_await` gotcha applies — the `RequestContext`'s OTel scope must be captured into the coroutine frame rather than relied upon via TLS after a suspension. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers the migration.
+For higher fan-in, the same handler logic converts to coroutines via asio-grpc. The handler becomes an `asio::awaitable`; `pg_pool_.acquire_async()` and `stub->CalculateTax_async()` `co_await` their completion; the gRPC thread pool serves more concurrent calls because none are blocked on I/O. The TLS-across-`co_await` gotcha applies: the `RequestContext`'s OTel scope must be captured into the coroutine frame rather than relied upon via TLS after a suspension. [Doc 05]({{ '/docs/05-threading/' | relative_url }}) covers the migration.
 
 For this document, the sync version stays. The coroutine version is a mechanical refactor once the team is ready.
 
@@ -493,7 +507,7 @@ int main(int argc, char** argv) try {
 }
 ```
 
-Twelve numbered steps; every one of them maps back to a prior document. The structure is mechanical and the same shape applies to any C++ gRPC service in this stack — only the specific subsystems change.
+Twelve numbered steps; every one of them maps back to a prior document. The structure is mechanical, and the same shape applies to any C++ gRPC service in this stack; only the specific subsystems change.
 
 The signal handler from [Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) is unchanged:
 
@@ -561,11 +575,11 @@ services:
       - internal
 ```
 
-The image binary depends on `grpc_health_probe` being on the `$PATH` inside the container — it's a tiny Go binary that the build adds to the image. The `start_period: 30s` matches the staged-startup window from `main()` (warm pools, connect channels, flip to SERVING).
+The image binary depends on `grpc_health_probe` being on the `$PATH` inside the container: it's a tiny Go binary that the build adds to the image. The `start_period: 30s` matches the staged-startup window from `main()` (warm pools, connect channels, flip to SERVING).
 
 ## Kubernetes deployment
 
-The equivalent Kubernetes resources — Deployment, Service, and the optional ConfigMap/Secret for credentials:
+The equivalent Kubernetes resources (Deployment, Service, and the optional ConfigMap/Secret for credentials):
 
 ```yaml
 apiVersion: apps/v1
@@ -659,9 +673,9 @@ spec:
     targetPort: 50051
 ```
 
-The `CPU_LIMIT` environment variable is sourced from the container's own `resources.limits.cpu` via the `resourceFieldRef` mechanism — the Kubernetes downward API. The application then reads `$CPU_LIMIT` at startup rather than re-deriving from cgroups. This is the cleanest production wiring for the pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}); the orchestrator already knows the limit, so the application should not re-derive it.
+The `CPU_LIMIT` environment variable is sourced from the container's own `resources.limits.cpu` via the `resourceFieldRef` mechanism: the Kubernetes downward API. The application then reads `$CPU_LIMIT` at startup rather than re-deriving from cgroups. This is the cleanest production wiring for the pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}); the orchestrator already knows the limit, so the application should not re-derive it.
 
-The `securityContext` block is the Kubernetes counterpart to a hardened container — read-only rootfs, non-root user, no privilege escalation, all capabilities dropped. These are independent of statelessness but worth turning on by default for any production service.
+The `securityContext` block is the Kubernetes counterpart to a hardened container: read-only rootfs, non-root user, no privilege escalation, all capabilities dropped. These are independent of statelessness but worth turning on by default for any production service.
 
 ## Recommendation summary
 
@@ -708,7 +722,7 @@ This document is the integration of the patterns developed in the prior nine; th
 
 **gRPC C++ documentation, "Best Practices" (`grpc.io/docs/languages/cpp/best_practices/`).** The official guidance on channel reuse, threading models, deadline propagation, and the callback API. Worth reading once cover-to-cover; this document operationalizes most of its recommendations.
 
-**Geewax, *API Design Patterns*.** The cross-cutting concerns chapters — error handling, idempotency, pagination, batching — are directly applicable to designing the service's RPCs. The proto shape and the error-translation pattern in the handler follow Geewax's framing.
+**Geewax, *API Design Patterns*.** The cross-cutting concerns chapters (error handling, idempotency, pagination, batching) are directly applicable to designing the service's RPCs. The proto shape and the error-translation pattern in the handler follow Geewax's framing.
 
 **Iglberger, *C++ Software Design*.** The dependency-injection chapter is the architectural underpinning of the `main()`-owned wiring shown here. The strategy chapter applies to how the handler uses the channel cache, the pool, and the cache as injected collaborators rather than reached-for singletons.
 

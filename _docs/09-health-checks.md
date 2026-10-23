@@ -7,13 +7,27 @@ sectionid: docs
 part: operational
 ---
 
-# 09 — Health Checks as the Public API of Statelessness
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Distinguish startup, liveness, and readiness probes, and what failing each one causes
+- Implement the gRPC standard health protocol with `HealthCheckServiceInterface` and `SetServingStatus`
+- Decide between same-port and separate-port health checks based on exposure and overload risk
+- Wire a staged-startup sequence that flips health from `NOT_SERVING` to `SERVING` only after initialization completes
+- Write a graceful-shutdown sequence that drains readiness, cancels background workers, and destructs process-scoped state in reverse order
+
+## Why this matters
+
+A service that is architecturally correct (RAII-clean, properly pooled, properly externalized) still gets killed mid-request or takes traffic before it can serve if its health checks report the wrong thing. The orchestrator only knows what the probes tell it. A liveness probe that fails on a downstream outage turns a single dependency failure into a fleet-wide restart storm; a readiness probe that never flips during shutdown drops in-flight requests on the floor.
+
+These failures are hard to catch in development, because a single-instance `docker run` rarely exercises the restart, drain, and rolling-deploy paths that expose them. They show up during a real deploy or a real outage, exactly when a wrong health signal costs the most. Getting the three probes right, and wiring shutdown to drain before exit, turns deploys and failures into routine, unremarkable events instead of incidents.
 
 ## Thesis
 
-The health-check endpoint is the orchestrator's API into the service. It is the mechanism by which Docker or Kubernetes decides whether to route traffic to a replica, whether to restart a sick one, and whether a newly-started one has finished initializing. The rest of the doc set has been about getting the internals of statelessness right — RAII, PMR, process-scoped state, threading, externalization, ephemeral filesystem. The health check is where those internals meet the orchestrator. Get it wrong and the architectural work doesn't matter: a service that's correctly designed but reports wrong health gets killed during deploys, takes traffic before it can serve, or fails to be removed from rotation when it goes bad.
+The health-check endpoint is the orchestrator's API into the service. It is the mechanism by which Docker or Kubernetes decides whether to route traffic to a replica, whether to restart a sick one, and whether a newly-started one has finished initializing. The rest of the doc set has been about getting the internals of statelessness right: RAII, PMR, process-scoped state, threading, externalization, ephemeral filesystem. The health check is where those internals meet the orchestrator. Get it wrong and the architectural work doesn't matter: a service that's correctly designed but reports wrong health gets killed during deploys, takes traffic before it can serve, or fails to be removed from rotation when it goes bad.
 
-The health-check semantics are more subtle than "is the service up." There are at least three distinct questions an orchestrator wants to ask — should I kill this replica, should I route traffic to it, has it finished starting up — and conflating them produces failure modes that look correct in development and fail in production. Kubernetes exposes the three as separate probes (startup, liveness, readiness); Docker's `HEALTHCHECK` directive collapses them into one. Either way, the C++ service has to think about each distinctly and answer them correctly.
+The health-check semantics are more subtle than "is the service up." There are at least three distinct questions an orchestrator wants to ask (should I kill this replica, should I route traffic to it, has it finished starting up) and conflating them produces failure modes that look correct in development and fail in production. Kubernetes exposes the three as separate probes (startup, liveness, readiness); Docker's `HEALTHCHECK` directive collapses them into one. Either way, the C++ service has to think about each distinctly and answer them correctly.
 
 This document covers the health-check model: the three probes and what each means, the gRPC standard health protocol that's become the canonical answer, the same-port-vs-separate-port trade-off, what "alive" and "ready" actually mean for a C++ service, and the graceful-shutdown sequence that ties [Doc 05 (threading)]({{ '/docs/05-threading/' | relative_url }})'s `std::stop_token`, [Doc 07 (state externalization)]({{ '/docs/07-state-externalization/' | relative_url }})'s pool draining, and [Doc 06 (12-factor)]({{ '/docs/06-twelve-factor/' | relative_url }})'s destruction order into a single coherent flow.
 
@@ -29,11 +43,11 @@ This document covers the health-check model: the three probes and what each mean
 > Two refinements the companion makes to the code shown below, both for
 > correctness: it calls `SetServingStatus` through the public
 > **`bool` overload** (`SetServingStatus(name, true/false)`) rather than the
-> `grpc::health::v1` enum sketched here — the bool form is the documented
+> `grpc::health::v1` enum sketched here: the bool form is the documented
 > `HealthCheckServiceInterface` API and needs no generated `health.pb.h` on
 > the server. And its signal handlers set only a `volatile sig_atomic_t`
 > flag, with a dedicated control thread doing the `SetServingStatus` /
-> `Shutdown` work — the async-signal-safe refinement of the in-handler
+> `Shutdown` work: the async-signal-safe refinement of the in-handler
 > version shown in the Graceful-shutdown section (`signal-safety(7)`). The
 > companion also uses the hybrid shape from the *separate-port vs same-port*
 > section: HTTP `/healthz` for liveness, the gRPC health service for
@@ -43,11 +57,11 @@ This document covers the health-check model: the three probes and what each mean
 
 Kubernetes distinguishes three probes per container. Docker has a single `healthcheck`. The semantic distinctions are worth understanding even when only one of them is configurable, because they translate to the questions any orchestrator needs answered.
 
-The **startup probe** asks "has the service finished initializing yet?" Until it succeeds, the other probes are not run. This is the probe that gives a C++ service time to construct its `TracerProvider`, build its channel cache, warm its connection pools, and load any deserialized configuration — all the process-scoped state from [Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }}). A slow-starting service that doesn't declare a startup probe risks being killed by liveness failures during its initialization. The probe is intended to be permissive: long timeout, many retries, no harm in being slow during the startup window.
+The **startup probe** asks "has the service finished initializing yet?" Until it succeeds, the other probes are not run. This is the probe that gives a C++ service time to construct its `TracerProvider`, build its channel cache, warm its connection pools, and load any deserialized configuration: all the process-scoped state from [Doc 04 (process-scoped state)]({{ '/docs/04-process-scoped-state/' | relative_url }}). A slow-starting service that doesn't declare a startup probe risks being killed by liveness failures during its initialization. The probe is intended to be permissive: long timeout, many retries, no harm in being slow during the startup window.
 
-The **liveness probe** asks "is the service deadlocked or otherwise unable to serve?" If it fails repeatedly, the orchestrator kills the container and starts a fresh one. The intended use is for catching processes that are running but have stopped making progress — a stuck thread holding a critical lock, an infinite loop in a background worker, a deadlock that the process can't recover from. The probe should be cheap and direct: does the process respond to a no-op call?
+The **liveness probe** asks "is the service deadlocked or otherwise unable to serve?" If it fails repeatedly, the orchestrator kills the container and starts a fresh one. The intended use is for catching processes that are running but have stopped making progress (a stuck thread holding a critical lock, an infinite loop in a background worker, a deadlock that the process can't recover from). The probe should be cheap and direct: does the process respond to a no-op call?
 
-The **readiness probe** asks "should I send traffic to this replica?" If it fails, the orchestrator stops routing new requests to the replica (removes it from the Service's endpoint set) but does not kill it. This is the probe that handles transient unhealthiness — connection pool exhaustion, dependency outage, graceful shutdown — where the service is alive but temporarily unable to serve. The orchestrator continues to consult the probe; if the replica recovers, traffic resumes.
+The **readiness probe** asks "should I send traffic to this replica?" If it fails, the orchestrator stops routing new requests to the replica (removes it from the Service's endpoint set) but does not kill it. This is the probe that handles transient unhealthiness (connection pool exhaustion, dependency outage, graceful shutdown) where the service is alive but temporarily unable to serve. The orchestrator continues to consult the probe; if the replica recovers, traffic resumes.
 
 The composition matters: until the startup probe succeeds, the others are not consulted. Once startup succeeds, liveness and readiness run on their own schedules. Liveness failures lead to restarts; readiness failures lead to traffic removal. A correctly-designed health system has liveness rarely fail and readiness occasionally fail during deploys and transient issues.
 
@@ -148,7 +162,7 @@ startupProbe:
   periodSeconds: 2
 ```
 
-Note the readiness probe specifies a `service:` name — it asks the health service for the specific application service's status, not the server-wide status. The liveness probe asks for the empty-name status (the server's). This composition means: liveness fails only when the whole server is unresponsive; readiness fails when the specific application service is unhealthy, even if the server itself is fine. The behaviour matches the semantic distinction from earlier sections.
+Note the readiness probe specifies a `service:` name: it asks the health service for the specific application service's status, not the server-wide status. The liveness probe asks for the empty-name status (the server's). This composition means liveness fails only when the whole server is unresponsive, while readiness fails when the specific application service is unhealthy, even if the server itself is fine. The behaviour matches the semantic distinction from earlier sections.
 
 ## Separate-port vs same-port
 
@@ -166,7 +180,7 @@ Separate-port is more secure when the application port is exposed to untrusted n
 
 Separate-port also allows different rate-limiting and timeout policies. The gRPC server's `MaxConcurrentStreams` and `KeepaliveTime` settings apply to the application port; the health port can have looser settings for the cheap probe traffic.
 
-Separate-port is useful when probes need to survive gRPC server overload. If the gRPC server is saturated and not accepting new connections, the gRPC-on-same-port health check fails too, which causes the orchestrator to kill the replica — exactly the wrong response to overload. A separate-port HTTP probe that just checks "is the process alive" survives overload and reports correctly.
+Separate-port is useful when probes need to survive gRPC server overload. If the gRPC server is saturated and not accepting new connections, the gRPC-on-same-port health check fails too, which causes the orchestrator to kill the replica: exactly the wrong response to overload. A separate-port HTTP probe that just checks "is the process alive" survives overload and reports correctly.
 
 > **Opinion.** Default to same-port simplicity for internal-only services. Move to separate-port when (a) the application port is exposed externally and the security separation matters, or (b) the application port is prone to overload and the orchestrator's response to overload-induced probe failures is making things worse. In production-grade services, separate-port is usually worth the extra configuration.
 
@@ -174,7 +188,7 @@ A hybrid pattern is common: a small HTTP server on a separate port for liveness 
 
 ## Defining a startup probe correctly
 
-C++ services often have non-trivial startup time — the static initialization tax from [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}), plus process-scoped state construction from [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}), plus initial connection establishment from [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}). A service that takes 10 seconds to be ready and uses only a liveness probe with a 1-second timeout will get killed before it can start.
+C++ services often have non-trivial startup time: the static initialization tax from [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}), plus process-scoped state construction from [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}), plus initial connection establishment from [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}). A service that takes 10 seconds to be ready and uses only a liveness probe with a 1-second timeout will get killed before it can start.
 
 The startup probe pattern handles this. While the startup probe runs, neither the liveness nor the readiness probe runs; the orchestrator gives the service time to come up. Once startup succeeds (typically when the gRPC server reports server-wide SERVING), the other probes take over.
 
@@ -189,7 +203,7 @@ startupProbe:
   # Total: up to 60 seconds for startup
 ```
 
-Docker's equivalent uses the `--start-period` option on the `HEALTHCHECK` directive — during the start period, failures are not counted against the retries budget.
+Docker's equivalent uses the `--start-period` option on the `HEALTHCHECK` directive: during the start period, failures are not counted against the retries budget.
 
 The application-side pattern uses the staged-startup approach from [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}): start the server with health reporting NOT_SERVING, do the expensive initialization, then flip health to SERVING when ready:
 
@@ -232,7 +246,7 @@ int main(int argc, char** argv) {
 }
 ```
 
-The skeleton-then-wire pattern is awkward because gRPC's `ServerBuilder` requires service registration before `BuildAndStart()`. In practice, services often pre-construct dependency placeholders (default-constructed channel caches, pool with `expected_size=0`) and fill them in mid-startup. An alternative is to put the expensive work first and accept that the gRPC server doesn't bind to its port until the work is done — which loses the staged-startup property but is simpler. The right choice depends on whether the orchestrator's probe timing makes the simpler pattern feasible.
+The skeleton-then-wire pattern is awkward because gRPC's `ServerBuilder` requires service registration before `BuildAndStart()`. In practice, services often pre-construct dependency placeholders (default-constructed channel caches, pool with `expected_size=0`) and fill them in mid-startup. An alternative is to put the expensive work first and accept that the gRPC server doesn't bind to its port until the work is done, which loses the staged-startup property but is simpler. The right choice depends on whether the orchestrator's probe timing makes the simpler pattern feasible.
 
 ## Graceful shutdown
 
@@ -273,7 +287,7 @@ void install_signal_handler(grpc::Server* server,
 }
 ```
 
-The signal handler is intentionally minimal — signal handlers have severe restrictions on what they may call (no allocations, no thread synchronization that can deadlock against the signal-interrupted thread, no I/O beyond `write` to a known fd). The pattern above uses statics for state access; the operations performed are all safe-in-signal-context for gRPC's API.
+The signal handler stays minimal because signal handlers have severe restrictions on what they may call (no allocations, no thread synchronization that can deadlock against the signal-interrupted thread, no I/O beyond `write` to a known fd). The pattern above uses statics for state access; the operations performed are all safe-in-signal-context for gRPC's API.
 
 The full sequence, end to end:
 
@@ -294,13 +308,13 @@ Sizing `terminationGracePeriodSeconds` matters. The longest plausible in-flight 
 
 ## Health-check anti-patterns
 
-Three patterns are worth naming because they show up often.
+Three patterns show up often and deserve explicit names.
 
 **Liveness checks that test downstream dependencies.** A liveness probe that fails when the database is unreachable causes restart-storms during database outages: every replica restarts, comes up, sees the database still down, restarts again. The orchestrator burns CPU on restarts; the database recovers slower because of the connection churn from restart-induced reconnects; the impact widens. The fix is to keep liveness narrow: process responsive, gRPC server accepting connections. Downstream issues belong in readiness or in metrics-driven alerts.
 
-**Health checks that load the service.** A probe that runs a real query against the database, or that exercises the full request path, adds load proportional to the probe frequency. For a probe every 5 seconds across 100 replicas, that's 20 extra queries per second, every second. The check should be cheap — a no-op RPC, a "yes I'm here" response. The expensive question of "am I actually serving correctly?" belongs in synthetic monitoring run from outside the cluster, not in the orchestrator's probe loop.
+**Health checks that load the service.** A probe that runs a real query against the database, or that exercises the full request path, adds load proportional to the probe frequency. For a probe every 5 seconds across 100 replicas, that's 20 extra queries per second, every second. The check should be cheap: a no-op RPC, a "yes I'm here" response. The expensive question of "am I actually serving correctly?" belongs in synthetic monitoring run from outside the cluster, not in the orchestrator's probe loop.
 
-**Probes too aggressive in timing.** A liveness probe with `periodSeconds: 1` and `failureThreshold: 1` will kill the service on a single failed probe — including transient network issues, GC pauses in coexisting languages, scheduler hiccups under CPU pressure. The Kubernetes defaults (`periodSeconds: 10`, `failureThreshold: 3`) are usually right; deviate down only with a specific reason and only on the liveness probe with care.
+**Probes too aggressive in timing.** A liveness probe with `periodSeconds: 1` and `failureThreshold: 1` will kill the service on a single failed probe, including transient network issues, GC pauses in coexisting languages, and scheduler hiccups under CPU pressure. The Kubernetes defaults (`periodSeconds: 10`, `failureThreshold: 3`) are usually right; deviate down only with a specific reason and only on the liveness probe with care.
 
 ## Recommendation summary
 
@@ -330,7 +344,7 @@ Test the shutdown path locally with `docker stop` before deploying. The pattern 
 
 [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) covers backing-service connection pools and the outbox poller, both of which participate in the graceful-shutdown sequence.
 
-[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers ephemeral filesystem, which interacts with restart semantics — shutdown should not depend on writes to ephemeral storage surviving.
+[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) covers ephemeral filesystem, which interacts with restart semantics: shutdown should not depend on writes to ephemeral storage surviving.
 
 [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) (gRPC microservices) shows the complete `main()` wiring with health checks, signal handlers, and the shutdown sequence end-to-end.
 

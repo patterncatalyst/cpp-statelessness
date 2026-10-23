@@ -7,11 +7,11 @@ sectionid: docs
 part: orientation
 ---
 
-# 00 — Index and Reading Guide
+# 00: Index and Reading Guide
 
 ## Purpose
 
-This compendium covers C++20/23 service design for deployment to Linux containers. Its through-line is *statelessness* as a deployment property — what makes a service safe to kill, replace, and replicate at the orchestrator's discretion — and how the C++ language features, library choices, and operational patterns either support that property or quietly undermine it.
+This compendium covers C++20/23 service design for deployment to Linux containers. Its through-line is *statelessness* as a deployment property (what makes a service safe to kill, replace, and replicate at the orchestrator's discretion) and how the C++ language features, library choices, and operational patterns either support that property or quietly undermine it.
 
 The treatment is opinionated and reference-style. Where positions are taken, they are marked as `> **Opinion.**` callouts. Where multiple acceptable approaches exist, both are described with their trade-offs. The goal is that an experienced C++ developer or architect can read the set straight through to understand the design space, or jump to a single document to solve a specific problem.
 
@@ -20,14 +20,14 @@ The treatment is opinionated and reference-style. Where positions are taken, the
 > walkthrough one: third-person, denser than a step-by-step guide,
 > with explicit `> **Opinion.**` callouts separating the author's
 > positions from the descriptive material. There's no narrated demo
-> per section — each document is meant to be consulted for a design
+> per section; each document is meant to be consulted for a design
 > question and read straight through when the whole space matters.
 
 ## Audience
 
-The intended reader is a seasoned C++ developer or architect who knows the language well — RAII, move semantics, templates, the standard library — and is now building or operating services that deploy to Docker or Kubernetes. Familiarity with gRPC, OpenTelemetry, and a Grafana-stack (Loki, Tempo, Mimir) observability environment is assumed; the toolchain references are GCC/Clang, Conan, CMake, Ninja, with C++20 as the portable baseline and C++23 features called out where they meaningfully help.
+The intended reader is a seasoned C++ developer or architect who knows the language well (RAII, move semantics, templates, the standard library) and is now building or operating services that deploy to Docker or Kubernetes. Familiarity with gRPC, OpenTelemetry, and a Grafana-stack (Loki, Tempo, Mimir) observability environment is assumed; the toolchain references are GCC/Clang, Conan, CMake, Ninja, with C++20 as the portable baseline and C++23 features called out where they meaningfully help.
 
-Developers coming from monolith-heavy C++ backgrounds will recognize a recurring theme: instincts that served well in long-running daemons on dedicated hardware — Meyers singletons, file-based logging, static caches, "the process lives forever" — break in subtle ways under containerization. Each document calls out where the instinct misleads and what to use instead.
+Developers coming from monolith-heavy C++ backgrounds will recognize a recurring theme: instincts that served well in long-running daemons on dedicated hardware (Meyers singletons, file-based logging, static caches, "the process lives forever") break in subtle ways under containerization. Each document calls out where the instinct misleads and what to use instead.
 
 ## Reading order
 
@@ -39,27 +39,27 @@ For specific problems, the scenario guide below jumps to the relevant document.
 
 ## At a glance
 
-**[Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) — Stateless vs stateful as deployment posture.** The vocabulary doc. Statelessness is not a code property; it's a deployment posture that the same C++ binary can or cannot satisfy depending on what state it holds. Establishes the three-scope vocabulary (request-scope, process-scope, deploy-time-scope) used throughout, and the six "monolith intuitions that mislead" under containerization — including the thread pool one that ties to [Doc 05]({{ '/docs/05-threading/' | relative_url }}).
+**[Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}): Stateless vs stateful as deployment posture.** The vocabulary doc. Statelessness is not a code property; it's a deployment posture that the same C++ binary can or cannot satisfy depending on what state it holds. Establishes the three-scope vocabulary (request-scope, process-scope, deploy-time-scope) used throughout, and the six "monolith intuitions that mislead" under containerization, including the thread pool one that ties to [Doc 05]({{ '/docs/05-threading/' | relative_url }}).
 
-**[Doc 02]({{ '/docs/02-raii/' | relative_url }}) — RAII as the foundation for safe stateful work in a stateless service.** The mechanism that makes request scope concrete. RAII binds resource lifetime to C++ scope; the `RequestContext` pattern bundles per-request state into one RAII type. Covers the three exception-safety guarantees, the gRPC callback API as the request boundary, the common mistakes (throwing destructors, raw pointers, locks across `co_await`, manual try/catch cleanup, missing `noexcept` moves), and the performance side of construction and destruction in hot paths.
+**[Doc 02]({{ '/docs/02-raii/' | relative_url }}): RAII as the foundation for safe stateful work in a stateless service.** The mechanism that makes request scope concrete. RAII binds resource lifetime to C++ scope; the `RequestContext` pattern bundles per-request state into one RAII type. Covers the three exception-safety guarantees, the gRPC callback API as the request boundary, the common mistakes (throwing destructors, raw pointers, locks across `co_await`, manual try/catch cleanup, missing `noexcept` moves), and the performance side of construction and destruction in hot paths.
 
-**[Doc 03]({{ '/docs/03-pmr/' | relative_url }}) — PMR's `monotonic_buffer_resource` as architectural statelessness.** PMR is the in-language realization of "request brings its own memory, all releases together." Covers `monotonic_buffer_resource` mechanics, the request arena RAII pattern, the canonical layered monotonic + `unsynchronized_pool_resource` recipe, the choice of `std::` container types over PMR (`pmr::vector`, `pmr::flat_map`, `pmr::unordered_map`, with the destruction-asymmetry win explained), the lifetime trap counterexample, and C++23 additions (`std::pmr::stacktrace`, `std::flat_map`).
+**[Doc 03]({{ '/docs/03-pmr/' | relative_url }}): PMR's `monotonic_buffer_resource` as architectural statelessness.** PMR is the in-language realization of "request brings its own memory, all releases together." Covers `monotonic_buffer_resource` mechanics, the request arena RAII pattern, the canonical layered monotonic + `unsynchronized_pool_resource` recipe, the choice of `std::` container types over PMR (`pmr::vector`, `pmr::flat_map`, `pmr::unordered_map`, with the destruction-asymmetry win explained), the lifetime trap counterexample, and C++23 additions (`std::pmr::stacktrace`, `std::flat_map`).
 
-**[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) — Process-scoped state that's still stateless from the orchestrator's view.** Not all state is request-scoped; some legitimately lives for the process lifetime. The State Architecture Table is introduced here. Covers `TracerProvider`, gRPC channels, connection pools, prepared-statement caches, PMR upstream resources, in-process caches, parsed configuration. The `main()`-owned wiring pattern. OS container resource limits as the *budget* for sizing process-scoped state (memory, ephemeral storage; CPU coverage deferred to [Doc 05]({{ '/docs/05-threading/' | relative_url }})). Bounded vs unbounded structures.
+**[Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}): Process-scoped state that's still stateless from the orchestrator's view.** Not all state is request-scoped; some legitimately lives for the process lifetime. The State Architecture Table is introduced here. Covers `TracerProvider`, gRPC channels, connection pools, prepared-statement caches, PMR upstream resources, in-process caches, parsed configuration. The `main()`-owned wiring pattern. OS container resource limits as the *budget* for sizing process-scoped state (memory, ephemeral storage; CPU coverage deferred to [Doc 05]({{ '/docs/05-threading/' | relative_url }})). Bounded vs unbounded structures.
 
-**[Doc 05]({{ '/docs/05-threading/' | relative_url }}) — Threading and concurrency in a stateless service.** The cross-cutting concern that interacts with statelessness in non-obvious ways. Covers TLS as process-scoped (with the `CorrelationGuard` pattern), stack-based vs stackless concurrency (OS threads, C++20 stackless coroutines, Boost.Fiber stackful coroutines, the TLS-across-`co_await` gotcha), gRPC's threading model and the no-block rule, inter-thread communication and I/O waits. The deep treatment of CPU limits: CFS quota mechanics, throttling tail latency, thread stack memory budget, allocator arena counts under cgroup limits, the cgroup-detection helper, `std::stop_token` cooperative cancellation, the gRPC sync-server `ResourceQuota` configuration trap, PSI sidebar.
+**[Doc 05]({{ '/docs/05-threading/' | relative_url }}): Threading and concurrency in a stateless service.** The cross-cutting concern that interacts with statelessness in non-obvious ways. Covers TLS as process-scoped (with the `CorrelationGuard` pattern), stack-based vs stackless concurrency (OS threads, C++20 stackless coroutines, Boost.Fiber stackful coroutines, the TLS-across-`co_await` gotcha), gRPC's threading model and the no-block rule, inter-thread communication and I/O waits. The deep treatment of CPU limits: CFS quota mechanics, throttling tail latency, thread stack memory budget, allocator arena counts under cgroup limits, the cgroup-detection helper, `std::stop_token` cooperative cancellation, the gRPC sync-server `ResourceQuota` configuration trap, PSI sidebar.
 
-**[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) — 12-Factor adapted to C++.** The opinionated document. Most of the twelve factors map directly to C++; three collide: Config (the compile-time/link-time/env-time/runtime split), Processes (Meyers singleton critique and dependency-injection alternative), Disposability (C++ startup tax, the staged-startup pattern, `constinit`). Brief tour of the other factors.
+**[Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}): 12-Factor adapted to C++.** The opinionated document. Most of the twelve factors map directly to C++; three collide: Config (the compile-time/link-time/env-time/runtime split), Processes (Meyers singleton critique and dependency-injection alternative), Disposability (C++ startup tax, the staged-startup pattern, `constinit`). Brief tour of the other factors.
 
-**[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) — State externalization patterns in C++.** What goes outside the process: authoritative session state, counters, durable workflow, queues, business data. Connection pools as process-scoped infrastructure with per-handler RAII checkout. The `ScopedConnection` pattern with `invalidate()` for broken-connection handling. Idempotency keys, deadlines propagating to backing services, retry-with-backoff vs fail-fast. The cache-fix for [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }})'s counterexample. The Outbox pattern for atomic DB-write-plus-event-emission.
+**[Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}): State externalization patterns in C++.** What goes outside the process: authoritative session state, counters, durable workflow, queues, business data. Connection pools as process-scoped infrastructure with per-handler RAII checkout. The `ScopedConnection` pattern with `invalidate()` for broken-connection handling. Idempotency keys, deadlines propagating to backing services, retry-with-backoff vs fail-fast. The cache-fix for [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }})'s counterexample. The Outbox pattern for atomic DB-write-plus-event-emission.
 
-**[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) — The ephemeral filesystem trap.** The container filesystem is ephemeral. The overlayfs layer model, `read_only: true` as the forcing function, what goes where (rootfs read-only, `/tmp` tmpfs, persistent volumes for what survives), logs to stdout, the C++ library traps (spdlog file defaults, crash dumps, ML model caches, coverage data, prometheus_cpp textfiles), Kubernetes ephemeral-storage budgets, rootless Docker's UID-mapping story (userns-remap), restart semantics as a feature.
+**[Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}): The ephemeral filesystem trap.** The container filesystem is ephemeral. The overlayfs layer model, `read_only: true` as the forcing function, what goes where (rootfs read-only, `/tmp` tmpfs, persistent volumes for what survives), logs to stdout, the C++ library traps (spdlog file defaults, crash dumps, ML model caches, coverage data, prometheus_cpp textfiles), Kubernetes ephemeral-storage budgets, rootless Docker's UID-mapping story (userns-remap), restart semantics as a feature.
 
-**[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) — Health checks as the public API of statelessness.** The orchestrator's API into the service. The three probes (startup, liveness, readiness) and what each means. The gRPC standard health protocol with the `HealthCheckServiceInterface` C++ API. Separate-port vs same-port trade-offs. The graceful-shutdown sequence that ties together `std::stop_token` ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), pool draining ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})), and reverse-order destruction ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})). Health-check anti-patterns.
+**[Doc 09]({{ '/docs/09-health-checks/' | relative_url }}): Health checks as the public API of statelessness.** The orchestrator's API into the service. The three probes (startup, liveness, readiness) and what each means. The gRPC standard health protocol with the `HealthCheckServiceInterface` C++ API. Separate-port vs same-port trade-offs. The graceful-shutdown sequence that ties together `std::stop_token` ([Doc 05]({{ '/docs/05-threading/' | relative_url }})), pool draining ([Doc 07]({{ '/docs/07-state-externalization/' | relative_url }})), and reverse-order destruction ([Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})). Health-check anti-patterns.
 
-**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) — Microservices with gRPC and C++.** The end-to-end integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
+**[Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}): Microservices with gRPC and C++.** The end-to-end integration. A realistic order-pricing service skeleton: proto, `Config`, `RequestContext`, process-scoped state wiring, the full handler with PostgreSQL access and outbound gRPC tax calculation and idempotency, the complete `main()` with twelve cross-referenced steps, the signal handler, full `compose.yaml`, full Kubernetes Deployment and Service manifest. Every prior pattern composed in one place.
 
-**[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) — Build tooling appendix.** Conan 2.x setup with version-pinned dependencies, dev and release profiles (AddressSanitizer in dev, LTO + hardening in release), CMake structure with proto codegen, the C++23 feature support table (GCC 14+ for `<stacktrace>` and `std::pmr::stacktrace`, GCC 15+ for `std::flat_map`), standard-library choice (libstdc++ vs libc++), multi-stage Containerfile pattern, full source for the vendored helpers (`cgroup_helper`, `psi_reader`, `otel_propagator`), test infrastructure, common gotchas.
+**[Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}): Build tooling appendix.** Conan 2.x setup with version-pinned dependencies, dev and release profiles (AddressSanitizer in dev, LTO + hardening in release), CMake structure with proto codegen, the C++23 feature support table (GCC 14+ for `<stacktrace>` and `std::pmr::stacktrace`, GCC 15+ for `std::flat_map`), standard-library choice (libstdc++ vs libc++), multi-stage Containerfile pattern, full source for the vendored helpers (`cgroup_helper`, `psi_reader`, `otel_propagator`), test infrastructure, common gotchas.
 
 ## The State Architecture Table
 
@@ -67,28 +67,28 @@ Reproduced from [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) 
 
 | State type | Process-scoped | Request-scoped | External |
 |---|:---:|:---:|:---:|
-| OpenTelemetry `TracerProvider` | ✓ | — | — |
-| OpenTelemetry `Tracer` (per library) | ✓ | — | — |
-| Active span / span context | — | ✓ | — |
-| gRPC `Channel` cache | ✓ | — | — |
-| gRPC `ClientContext` (per outbound RPC) | — | ✓ | — |
-| gRPC `CallbackServerContext` (per inbound RPC) | — | ✓ | — |
-| Redis / PostgreSQL connection pool | ✓ | — | — |
-| Single pooled connection (checked out) | — | ✓ (RAII) | — |
-| Prepared-statement cache | ✓ | — | — |
-| In-process best-effort cache | ✓ | — | — |
-| Parsed configuration | ✓ | — | — |
-| PMR upstream resource (heap, pool) | ✓ | — | — |
-| PMR `monotonic_buffer_resource` arena | — | ✓ | — |
-| Per-request parsed request / response | — | ✓ | — |
-| Per-request intermediate computations | — | ✓ | — |
-| Authoritative session / user state | — | — | ✓ |
-| User-visible counters, rate-limit windows | — | — | ✓ |
-| Durable workflow state | — | — | ✓ |
-| Queue items between services | — | — | ✓ |
-| Authoritative business data | — | — | ✓ |
-| `thread_local` storage | ✓ | — | — |
-| Thread pool, executor, fiber scheduler | ✓ | — | — |
+| OpenTelemetry `TracerProvider` | ✓ | – | – |
+| OpenTelemetry `Tracer` (per library) | ✓ | – | – |
+| Active span / span context | – | ✓ | – |
+| gRPC `Channel` cache | ✓ | – | – |
+| gRPC `ClientContext` (per outbound RPC) | – | ✓ | – |
+| gRPC `CallbackServerContext` (per inbound RPC) | – | ✓ | – |
+| Redis / PostgreSQL connection pool | ✓ | – | – |
+| Single pooled connection (checked out) | – | ✓ (RAII) | – |
+| Prepared-statement cache | ✓ | – | – |
+| In-process best-effort cache | ✓ | – | – |
+| Parsed configuration | ✓ | – | – |
+| PMR upstream resource (heap, pool) | ✓ | – | – |
+| PMR `monotonic_buffer_resource` arena | – | ✓ | – |
+| Per-request parsed request / response | – | ✓ | – |
+| Per-request intermediate computations | – | ✓ | – |
+| Authoritative session / user state | – | – | ✓ |
+| User-visible counters, rate-limit windows | – | – | ✓ |
+| Durable workflow state | – | – | ✓ |
+| Queue items between services | – | – | ✓ |
+| Authoritative business data | – | – | ✓ |
+| `thread_local` storage | ✓ | – | – |
+| Thread pool, executor, fiber scheduler | ✓ | – | – |
 
 The bottom two rows on threading state stand out: `thread_local` looks request-scoped to a developer reading the code, and it is one of the most common silent-bug sources. The `CorrelationGuard` pattern from [Doc 05]({{ '/docs/05-threading/' | relative_url }}) puts a `thread_local` write inside an RAII type whose scope is the handler, which is the legitimate way to use TLS in a request handler.
 
@@ -104,15 +104,15 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 4. **Threading is the third axis of statelessness.** Thread pools and TLS are process-scoped infrastructure; coroutines complicate TLS reads across `co_await`; gRPC's threading model dictates the application architecture.
 
-5. **RAII has a performance side, not just a correctness side.** Constructor/destructor cost, `noexcept` moves, trivial destructibility, PMR destruction-asymmetry — all interact with the request/process scope split.
+5. **RAII has a performance side, not just a correctness side.** Constructor/destructor cost, `noexcept` moves, trivial destructibility, and PMR destruction-asymmetry all interact with the request/process scope split.
 
 6. **`std::` containers need explicit choices in a service context.** Default reflexes (`std::map`, `std::unordered_map`) are often suboptimal; `pmr::vector`, `pmr::flat_map`, Abseil hash maps each have specific contexts where they shine.
 
-7. **OS container requests and limits shape C++ behaviour in non-obvious ways.** CPU limits via CFS quotas, memory limits as OOM ceiling, ephemeral-storage as log-volume budget — all affect how process-scoped state must be sized.
+7. **OS container requests and limits shape C++ behaviour in non-obvious ways.** CPU limits via CFS quotas, memory limits as OOM ceiling, and ephemeral-storage as log-volume budget all affect how process-scoped state must be sized.
 
 8. **"Container" is overloaded vocabulary.** `std::vector` is a container; an OCI/Docker/Podman container is a container; a Kubernetes container is a container inside a pod. Where ambiguity is possible, the documents say "std container" / "OS container" / "Kubernetes container" explicitly.
 
-9. **C++ pays a "globals tax" that 12-factor languages don't.** Static initialization, the SIOF, Meyers singleton synchronization, global ctor pile-up — all affect cold-start latency that orchestrators measure.
+9. **C++ pays a "globals tax" that 12-factor languages don't.** Static initialization, the SIOF, Meyers singleton synchronization, and global ctor pile-up all affect cold-start latency that orchestrators measure.
 
 10. **gRPC C++ is the through-line.** The canonical transport in this stack, owns several process-scoped state hotspots, defines the standard health protocol, drives the application threading model.
 
@@ -126,9 +126,9 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 **Deploy-time scope.** The lifetime of a particular deployment, often longer than any single container instance. Configuration values that vary between dev and production but not between two replicas of the same service live here, in environment variables or config maps. [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}).
 
-**External state.** State that lives outside any process — Redis, PostgreSQL, Kafka, S3. Lifetime decoupled from any one container; authoritative for cross-replica consistency. [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
+**External state.** State that lives outside any process (Redis, PostgreSQL, Kafka, S3). Lifetime decoupled from any one container; authoritative for cross-replica consistency. [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}).
 
-**OS container.** An OCI-compatible container instance — Docker, Podman, containerd. Has a process tree, a filesystem (with an ephemeral overlayfs writable layer), a network namespace, cgroup-enforced resource limits. The "container" in cloud-native parlance.
+**OS container.** An OCI-compatible container instance (Docker, Podman, containerd). Has a process tree, a filesystem (with an ephemeral overlayfs writable layer), a network namespace, cgroup-enforced resource limits. The "container" in cloud-native parlance.
 
 **Kubernetes container.** A container inside a pod. Has the OS container's properties plus pod-level networking, volume mounts, and probe configuration. Multiple containers per pod is unusual for application code but common for sidecars (Envoy, otel-collector).
 
@@ -140,7 +140,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 **Building a new C++ gRPC service from scratch.** Read [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) (vocabulary), [Doc 02]({{ '/docs/02-raii/' | relative_url }}) (RAII), [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) (process state + table), [Doc 09]({{ '/docs/09-health-checks/' | relative_url }}) (health checks), [Doc 10]({{ '/docs/10-grpc-microservices/' | relative_url }}) (integration). Use [Doc 11]({{ '/docs/11-build-tooling/' | relative_url }}) as the build-tooling reference while setting up the project. [Doc 03]({{ '/docs/03-pmr/' | relative_url }}), 05, 06, 07, 08 can be read as needed when specific concerns surface.
 
-**Migrating a C++ monolith to containers.** Read [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) (especially the monolith-intuitions section), [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) (12-factor adaptation, where most of the migration tension lives), [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) (state externalization, the biggest mechanical refactor), [Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) (ephemeral filesystem — the silent bug source in migrations). [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) establishes the State Architecture Table that drives the audit.
+**Migrating a C++ monolith to containers.** Read [Doc 01]({{ '/docs/01-deployment-posture/' | relative_url }}) (especially the monolith-intuitions section), [Doc 06]({{ '/docs/06-twelve-factor/' | relative_url }}) (12-factor adaptation, where most of the migration tension lives), [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) (state externalization, the biggest mechanical refactor), [Doc 08]({{ '/docs/08-ephemeral-filesystem/' | relative_url }}) (ephemeral filesystem: the silent bug source in migrations). [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }}) establishes the State Architecture Table that drives the audit.
 
 **Troubleshooting tail-latency spikes.** Read [Doc 05]({{ '/docs/05-threading/' | relative_url }}) first (CFS throttling, oversubscription, thread pool sizing). Then [Doc 03]({{ '/docs/03-pmr/' | relative_url }}) (PMR destruction asymmetry, allocator contention). [Doc 04]({{ '/docs/04-process-scoped-state/' | relative_url }})'s CPU-limits section gives the budget framing.
 
@@ -156,7 +156,7 @@ Eleven themes recur through the compendium; they're worth keeping in mind across
 
 ## Out of scope
 
-A few topics the compendium does not cover — the list below marks the boundary.
+A few topics the compendium does not cover; the list below marks the boundary.
 
 **Non-gRPC transports.** HTTP/REST via Drogon, Crow, or restbed; GraphQL via cppgraphqlgen; raw socket protocols. The patterns transfer but the specific API surfaces differ.
 
@@ -205,6 +205,6 @@ Online references used across the set:
 - Linux kernel documentation on cgroups v2, CFS, PSI (`kernel.org/doc/`)
 - cppreference (`en.cppreference.com`) for C++ standard library specifics
 - Conan 2 documentation (`docs.conan.io`) and CMake documentation
-- redis-plus-plus, libpqxx, librdkafka, spdlog, Abseil — each library's own README and API docs
+- redis-plus-plus, libpqxx, librdkafka, spdlog, Abseil: each library's own README and API docs
 
 The bibliography is short by design: the patterns in this compendium come from a small number of well-thought-out sources rather than a sprawl of blog posts and Stack Overflow answers. For specific questions not covered, the books above are the strongest starting points.

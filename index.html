@@ -9,7 +9,7 @@ title: Home
         <h1>Stateless C++20/23 service&nbsp;design,&nbsp;for&nbsp;containers.</h1>
         <p class="hero__lead">
             An opinionated reference on what makes a C++ service safe to
-            kill, replace, and replicate at an orchestrator's discretion —
+            kill, replace, and replicate at an orchestrator's discretion,
             and how RAII, PMR, threading, and twelve-factor practice either
             support that property or quietly undermine it. Read it straight
             through, or jump to the document that answers the question
@@ -49,7 +49,7 @@ title: Home
             </div>
             <div class="stat">
                 <span class="stat__value">2</span>
-                <span class="stat__label">Companion decks — 101 on-ramp and 201 compendium</span>
+                <span class="stat__label">Companion decks: 101 on-ramp and 201 compendium</span>
             </div>
             <div class="stat">
                 <span class="stat__value">13</span>
@@ -66,7 +66,7 @@ title: Home
             Seven parts, read in order the first time. Each part page
             lists its chapters; each chapter stands on its own for a
             reader jumping in to solve one problem. The orientation part
-            is the map — start there if you only have time for one page.
+            is the map; start there if you only have time for one page.
         </p>
         <div class="cards">
             {%- assign parts_sorted = site.parts | sort: "order" -%}
@@ -94,7 +94,7 @@ title: Home
     <div class="container">
         <h2 class="section-heading">Everything else on the site</h2>
         <p class="section-sub">
-            The chapters are the core; these round it out — runnable
+            The chapters are the core; these round it out: runnable
             proof for every claim, the diagrams that explain the
             architecture, the books behind the opinions, and the two
             decks for presenting the material.
@@ -104,21 +104,21 @@ title: Home
                 <span class="doc-card__icon" aria-hidden="true">🗺️</span>
                 <span>
                     <span class="doc-card__title">Index &amp; reading guide</span>
-                    <span class="doc-card__desc">The full map — reading order, a scenario guide, the State Architecture Table, and the consolidated bibliography.</span>
+                    <span class="doc-card__desc">The full map: reading order, a scenario guide, the State Architecture Table, and the consolidated bibliography.</span>
                 </span>
             </a>
             <a class="doc-card" href="{{ '/examples/' | relative_url }}">
                 <span class="doc-card__icon" aria-hidden="true">📦</span>
                 <span>
                     <span class="doc-card__title">Runnable examples</span>
-                    <span class="doc-card__desc">Ten self-contained Docker demos, one per chapter from RAII through the gRPC end-to-end example — each proves a claim the chapters make.</span>
+                    <span class="doc-card__desc">Ten self-contained Docker demos, one per chapter from RAII through the gRPC end-to-end example, each proving a claim the chapters make.</span>
                 </span>
             </a>
             <a class="doc-card" href="{{ '/diagrams/' | relative_url }}">
                 <span class="doc-card__icon" aria-hidden="true">📐</span>
                 <span>
                     <span class="doc-card__title">Diagrams</span>
-                    <span class="doc-card__desc">Thirteen architecture and flow diagrams in an embedded gallery — click for fullscreen, download the .excalidraw source to edit.</span>
+                    <span class="doc-card__desc">Thirteen architecture and flow diagrams in an embedded gallery: click for fullscreen, download the .excalidraw source to edit.</span>
                 </span>
             </a>
             <a class="doc-card" href="{{ '/bibliography/' | relative_url }}">
@@ -131,15 +131,15 @@ title: Home
             <a class="doc-card" href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/blob/main/presentation/cpp-statelessness-101.pptx" rel="noopener">
                 <span class="doc-card__icon" aria-hidden="true">🎤</span>
                 <span>
-                    <span class="doc-card__title">Deck — 101 on-ramp</span>
+                    <span class="doc-card__title">Deck: 101 on-ramp</span>
                     <span class="doc-card__desc">The C++-lite talk: statelessness as a deployment property, for an audience that doesn't live in C++ day to day.</span>
                 </span>
             </a>
             <a class="doc-card" href="https://github.com/{{ site.github_username }}/{{ site.github_repo }}/blob/main/presentation/cpp-statelessness-compendium.pptx" rel="noopener">
                 <span class="doc-card__icon" aria-hidden="true">🏛️</span>
                 <span>
-                    <span class="doc-card__title">Deck — 201 compendium</span>
-                    <span class="doc-card__desc">The deep deck, structured like the site itself — a slide per chapter's core pattern, for a C++ audience.</span>
+                    <span class="doc-card__title">Deck: 201 compendium</span>
+                    <span class="doc-card__desc">The deep deck, structured like the site itself: a slide per chapter's core pattern, for a C++ audience.</span>
                 </span>
             </a>
         </div>

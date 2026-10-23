@@ -1,5 +1,5 @@
 ---
-title: "Statelessness 11 — Build tooling (vendored helpers)"
+title: "Statelessness 11: Build tooling (vendored helpers)"
 description: "The runnable slice of compendium Doc 11's build-tooling appendix: the cgroup_helper and psi_reader helpers built as static libraries, unit-tested with GoogleTest over their pure parsers, and exercised by a binary you run under different cgroup caps to watch cpu_limit_cores() track --cpus while hardware_concurrency() does not."
 order: 212
 card_eyebrow: "Compendium · <strong>Doc 11</strong>"
@@ -12,17 +12,17 @@ demo_dir: statelessness/11-build-tooling
 github_path: examples/statelessness/11-build-tooling
 ---
 
-> The full source for this example lives in [`examples/statelessness/11-build-tooling/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/11-build-tooling) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/11-build-tooling/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/11-build-tooling): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 11 — Build tooling appendix]({{ '/docs/11-build-tooling/' | relative_url }})
+[Doc 11: Build tooling appendix]({{ '/docs/11-build-tooling/' | relative_url }})
 
-Doc 11 is a build-tooling reference — Conan profiles, the library/version
+Doc 11 is a build-tooling reference: Conan profiles, the library/version
 inventory, the C++23 toolchain matrix, the multi-stage Containerfile pattern,
 and full source for three small vendored helpers that earlier docs referenced
 but never shipped runnable. This example is the runnable slice: it takes the
-two self-contained helpers — `cgroup_helper` (the cgroup limit reader) and
-`psi_reader` (the PSI parser) — and makes them real, built as static
+two self-contained helpers, `cgroup_helper` (the cgroup limit reader) and
+`psi_reader` (the PSI parser), and makes them real, built as static
 libraries, unit-tested with GoogleTest, and exercised under real cgroup caps.
 
 ## Why this matters
@@ -68,7 +68,7 @@ caps.
 **The cap sweep.** The demo runs the same image with no caps, then
 `--cpus=1.5`, then `--cpus=0.5 --memory=256m`, and you watch
 `cpu_limit_cores()` report each limit while `hardware_concurrency()` keeps
-reporting the full host count — the gap a container-aware service closes.
+reporting the full host count: the gap a container-aware service closes.
 
 ## How to run
 
@@ -87,7 +87,7 @@ CI verification: `scripts/test-stateless-demo-11-build-tooling.sh`.
 ## What you'll see
 
 Actual output from a host run on Fedora 44 (GCC 14, 22 logical cores,
-rootful Docker 29.x) — the gtest gate, then the same binary under three cap settings:
+rootful Docker 29.x): the gtest gate, then the same binary under three cap settings:
 
 ```
 ==> Act 1: unit tests (gtest over the pure parsers, in-container)
@@ -122,31 +122,31 @@ rootful Docker 29.x) — the gtest gate, then the same binary under three cap se
   `22` the whole time. A pool sized to the latter would oversubscribe 44:1
   against half a core.
 - **`memory_limit_bytes()` reads the exact cap.** `268435456` is precisely
-  256 MiB — the helper read `memory.max` directly, so a cache sized from it
+  256 MiB: the helper read `memory.max` directly, so a cache sized from it
   respects the cgroup rather than the host's RAM.
 - **`in_container()` tracks the engine's cgroup path, not the caps.** See
-  the caveat below — under a rootful Docker install the `/docker/` marker is
+  the caveat below: under a rootful Docker install the `/docker/` marker is
   usually present and it reads `true`; under rootless engines (rootless
   Docker, or Podman's rootless default) it often reads `false`. Either way it
   does *not* affect the limit readers, which are the critical path.
 
 ## Files
 
-- `vendor/cgroup_helper/` — cgroup v2/v1 CPU + memory limit reader (the
+- `vendor/cgroup_helper/`: cgroup v2/v1 CPU + memory limit reader (the
   threading section's helper), split into pure parsers + live readers
-- `vendor/psi_reader/` — PSI `some`/`full` parser, same parser/reader split
-- `src/main.cpp` — prints the live readings (the demo binary)
-- `tests/test_helpers.cpp` — the GoogleTest suite over the pure parsers
-- `CMakeLists.txt` — two static libs + demo + test suite
-- `conanfile.py` — GoogleTest (test-only, the single Conan dependency)
-- `Containerfile` — builder runs the test gate; `ubi-minimal` runtime
-- `compose.yml` — build + default unconstrained run
-- `demo.sh` — the gtest gate + the cgroup-cap sweep
+- `vendor/psi_reader/`: PSI `some`/`full` parser, same parser/reader split
+- `src/main.cpp`: prints the live readings (the demo binary)
+- `tests/test_helpers.cpp`: the GoogleTest suite over the pure parsers
+- `CMakeLists.txt`: two static libs + demo + test suite
+- `conanfile.py`: GoogleTest (test-only, the single Conan dependency)
+- `Containerfile`: builder runs the test gate; `ubi-minimal` runtime
+- `compose.yml`: build + default unconstrained run
+- `demo.sh`: the gtest gate + the cgroup-cap sweep
 
 ## Caveats and gotchas
 
 - **`in_container()`'s true/false split tracks rootful vs. rootless, not
-  which engine you used — and that's not a bug.** Under a standard rootful
+  which engine you used, and that's not a bug.** Under a standard rootful
   Docker install, `/proc/1/cgroup` contains a `/docker/` (or `.scope`) marker
   the heuristic matches, so it reads `true`. Under a rootless engine (rootless
   Docker, or Podman's rootless default), `/proc/1/cgroup` often reads `0::/`
@@ -157,7 +157,7 @@ rootful Docker 29.x) — the gtest gate, then the same binary under three cap se
   `in_container()` as a best-effort hint, not an authority.
 - **PSI is best-effort.** It requires `CONFIG_PSI=y` in the kernel and the
   pressure files to be exposed to the container. The reader degrades
-  gracefully when they're absent — don't treat a missing PSI reading as a
+  gracefully when they're absent; don't treat a missing PSI reading as a
   failure.
 - **The parsers are pure by design.** Parsing is separated from file I/O so
   the tests need no live cgroup. When you extend a parser, add a fixture-string
@@ -173,12 +173,12 @@ rootful Docker 29.x) — the gtest gate, then the same binary under three cap se
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 1** — the build, the
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 1**: the build, the
   toolchain, and measuring against the real environment; the cgroup reading is
   the "measure reality" discipline applied to resource limits
-- **Iglberger, *C++ Software Design*, ch. 2** — separating the pure parser from
+- **Iglberger, *C++ Software Design*, ch. 2**: separating the pure parser from
   the I/O-bound reader as a testability and single-responsibility design
-- **Enberg, *Latency*, ch. 3** — why the cgroup CPU budget (not the host count)
+- **Enberg, *Latency*, ch. 3**: why the cgroup CPU budget (not the host count)
   is the number that governs scheduling latency, the reason this helper exists
 
 ## The build-tooling angle

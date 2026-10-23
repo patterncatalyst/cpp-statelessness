@@ -1,10 +1,10 @@
 ---
-title: "Statelessness 10 — gRPC microservices (end-to-end example)"
-description: "The runnable companion to compendium Doc 10: an order-pricing gRPC service that composes every prior pattern — Config parsed once, process-scoped PgPool and channel cache, a per-request RAII bundle with a PMR arena, deadline-propagating PostgreSQL and outbound-gRPC helpers, idempotency, and the staged health/graceful-shutdown sequence — calling a second tax service over gRPC end to end."
+title: "Statelessness 10: gRPC microservices (end-to-end example)"
+description: "The runnable companion to compendium Doc 10: an order-pricing gRPC service that composes every prior pattern: Config parsed once, process-scoped PgPool and channel cache, a per-request RAII bundle with a PMR arena, deadline-propagating PostgreSQL and outbound-gRPC helpers, idempotency, and the staged health/graceful-shutdown sequence, calling a second tax service over gRPC end to end."
 order: 211
 card_eyebrow: "Compendium · <strong>Doc 10</strong>"
 card_title: "gRPC microservices (end-to-end example)"
-card_blurb: "The integration example: an order-pricing service composing every prior pattern — Config, process-scoped pools and a channel cache, a per-request PMR arena, deadline-propagated PostgreSQL and an outbound gRPC tax call, idempotency, and the staged health/shutdown sequence."
+card_blurb: "The integration example: an order-pricing service composing every prior pattern: Config, process-scoped pools and a channel cache, a per-request PMR arena, deadline-propagated PostgreSQL and an outbound gRPC tax call, idempotency, and the staged health/shutdown sequence."
 layout: example
 sectionid: examples
 permalink: /examples/statelessness-10-grpc-microservices/
@@ -12,14 +12,14 @@ demo_dir: statelessness/10-grpc-microservices
 github_path: examples/statelessness/10-grpc-microservices
 ---
 
-> The full source for this example lives in [`examples/statelessness/10-grpc-microservices/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/10-grpc-microservices) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/10-grpc-microservices/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/10-grpc-microservices): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 10 — Microservices with gRPC and C++]({{ '/docs/10-grpc-microservices/' | relative_url }})
+[Doc 10: Microservices with gRPC and C++]({{ '/docs/10-grpc-microservices/' | relative_url }})
 
 This is the integration example. The earlier examples each established one
 pattern in isolation; this one composes them into a single realistic gRPC
-service — an order-pricing service — so the way the pieces fit together is
+service (an order-pricing service) so the way the pieces fit together is
 visible end to end. `PriceOrder` looks a customer up in PostgreSQL, prices
 each line item, calls a **separate tax service over gRPC**, and returns a
 fully-priced order, idempotent on a client key and with the request deadline
@@ -27,8 +27,8 @@ propagated through every downstream call.
 
 ## Why this matters
 
-Each prior example proved a pattern alone. The real question — the one a team
-actually faces — is whether those patterns *compose* without fighting each
+Each prior example proved a pattern alone. The real question, the one a team
+actually faces, is whether those patterns *compose* without fighting each
 other, and this example answers it:
 
 - **Composition is where abstractions leak.** RAII request scope, a PMR
@@ -49,7 +49,7 @@ Every block maps back to an earlier document:
 
 - **`Config` parsed once** in `main()`, passed by `const&` (the 12-factor
   config pattern).
-- **Process-scoped state** — the `PgPool` and a `ChannelCache` — constructed
+- **Process-scoped state**: the `PgPool` and a `ChannelCache`, constructed
   once in `main()` and shared across request threads (process scope). gRPC
   channels are expensive to build and cheap to reuse, so they live for the
   process.
@@ -76,7 +76,7 @@ docker compose -f compose.yml up --build   # or: ./demo.sh
 ./demo.sh --clean                           # tear down
 ```
 
-The demo brings up three services — `postgres`, `tax-svc`, and `pricing-svc`
+The demo brings up three services: `postgres`, `tax-svc`, and `pricing-svc`
 (the last two share one image). The first build compiles the gRPC chain
 (~5 min cold); a warm Conan cache is far faster. `PriceOrder` is driven by an
 in-image `pricing-client` via `docker exec`, so no host gRPC tooling is
@@ -86,7 +86,7 @@ CI verification: `scripts/test-stateless-demo-10-grpc-microservices.sh`.
 
 ## What you'll see
 
-Actual output from a host run on Fedora 44 (GCC 14, Docker 29.x) —
+Actual output from a host run on Fedora 44 (GCC 14, Docker 29.x):
 the three acts, with the real figures from the seeded data:
 
 ```
@@ -118,54 +118,54 @@ the three acts, with the real figures from the seeded data:
   (`8948`), then the outbound gRPC call to `tax-svc` returning `626`, totalling
   `9574`. Every hop carried the request deadline.
 - **Act 2 short-circuits the outbound call.** carol is `tax_exempt`, so
-  `compute_tax` returns `0` *without* calling the tax service — the
+  `compute_tax` returns `0` *without* calling the tax service: the
   conditional-downstream-call point. `tax_cents: 0` with no `-> tax-svc` log
   line is the proof the outbound call was skipped.
 - **Act 3 proves idempotency at the store.** Replaying act 1's key returns the
-  *identical* `order_id` — the handler found the stored result and returned it
+  *identical* `order_id`: the handler found the stored result and returned it
   without recomputing or calling the tax service. That identical id is the
   whole idempotency guarantee, surviving across what could be a different
   replica.
 - **`SERVING` only after migrate.** The startup line shows both services
-  reach `SERVING` after their staged warm-up — the health sequence from the
+  reach `SERVING` after their staged warm-up, the health sequence from the
   health-checks example, running in this example's `main()`.
 
 ## Files
 
-- `src/pricing_svc.cpp` — the end-to-end example: the handler, the deadline-propagating
+- `src/pricing_svc.cpp`: the end-to-end example: the handler, the deadline-propagating
   helpers, and the twelve-step `main()`
-- `src/tax_svc.cpp` — the outbound tax upstream (the second service)
-- `src/request_context.hpp` — per-request RAII bundle + real PMR arena (the
+- `src/tax_svc.cpp`: the outbound tax upstream (the second service)
+- `src/request_context.hpp`: per-request RAII bundle + real PMR arena (the
   OTel span/scope is a documented seam)
-- `src/channel_cache.hpp` — process-scoped gRPC channel cache
-- `src/pg_pool.hpp` — the verified libpq pool, reused from 07
-- `src/config.hpp` — env-time `Config`
-- `src/pricing_client.cpp` — drives `PriceOrder` for the demo
-- `src/health_probe.cpp` — the minimal hermetic `grpc_health_probe`
-- `proto/{pricing,tax,health}.proto` — the example's API, the upstream, and
+- `src/channel_cache.hpp`: process-scoped gRPC channel cache
+- `src/pg_pool.hpp`: the verified libpq pool, reused from 07
+- `src/config.hpp`: env-time `Config`
+- `src/pricing_client.cpp`: drives `PriceOrder` for the demo
+- `src/health_probe.cpp`: the minimal hermetic `grpc_health_probe`
+- `proto/{pricing,tax,health}.proto`: the example's API, the upstream, and
   the standard health protocol
-- `CMakeLists.txt` — codegen 3 protos; build 4 binaries
-- `conanfile.py` — the gRPC trio (libpq is system)
-- `Containerfile` — gRPC-trio + libpq builder; `ubi-minimal` + libpq runtime
-- `compose.yml` — postgres + tax-svc + pricing-svc
-- `demo.sh` — the three acts
+- `CMakeLists.txt`: codegen 3 protos; build 4 binaries
+- `conanfile.py`: the gRPC trio (libpq is system)
+- `Containerfile`: gRPC-trio + libpq builder; `ubi-minimal` + libpq runtime
+- `compose.yml`: postgres + tax-svc + pricing-svc
+- `demo.sh`: the three acts
 
 ## Caveats and gotchas
 
 - **Faithful in architecture, lean in dependencies.** Doc 10's literal
   feature set reaches for libpqxx, Redis, OpenTelemetry, and jemalloc tuning.
   This example keeps the architecture and composition exactly but realizes it
-  on the verified stack — libpq (not libpqxx, gotcha G-67), PostgreSQL-direct
+  on the verified stack: libpq (not libpqxx, gotcha G-67), PostgreSQL-direct
   price lookup (Redis cache-aside marked as a seam), the request span as a
   documented OpenTelemetry seam, and the sync gRPC API. Each divergence is
   called out in the README.
-- **It emits no spans — nothing reaches Tempo.** The OpenTelemetry pipeline is
+- **It emits no spans; nothing reaches Tempo.** The OpenTelemetry pipeline is
   a documented seam, not a built dependency. "Host-verified green" means the
   *business* path (PostgreSQL + outbound gRPC + idempotency) was verified, not
   tracing. Don't expect a trace in Grafana from this example as shipped.
 - **The tax call is conditional.** `compute_tax` returns early for
   `tax_exempt` customers, so the outbound gRPC call only happens on the
-  taxable path. That's intentional (act 2 demonstrates it), not a missing
+  taxable path. Act 2 demonstrates that short-circuit; it is not a missing
   call.
 - **`statement_timeout` is set per query from the remaining budget.** A
   pooled connection is reused across requests with different deadlines, so the
@@ -176,12 +176,12 @@ the three acts, with the real figures from the seeded data:
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Enberg, *Latency*, ch. 6-7** — end-to-end deadline propagation and
+- **Enberg, *Latency*, ch. 6-7**: end-to-end deadline propagation and
   failure handling across service hops; the budget that flows through every
   call here
-- **Iglberger, *C++ Software Design*, ch. 3-4** — dependency injection and
+- **Iglberger, *C++ Software Design*, ch. 3-4**: dependency injection and
   the composition root; the twelve-step `main()` is that pattern at full scale
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 10-11** — networking,
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 10-11**: networking,
   channel reuse, and the concurrency model behind the gRPC server and the
   channel cache
 

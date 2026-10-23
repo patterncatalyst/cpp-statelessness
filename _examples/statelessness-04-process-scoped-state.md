@@ -1,5 +1,5 @@
 ---
-title: "Statelessness 04 — Process-scoped state"
+title: "Statelessness 04: Process-scoped state"
 description: "The runnable companion to compendium Doc 04: the composition root in main(), dependency injection by reference, a bounded LRU cache sized against the cgroup budget, and correct reverse-order teardown from RAII."
 order: 204
 card_eyebrow: "Compendium · <strong>Doc 04</strong>"
@@ -12,13 +12,13 @@ demo_dir: statelessness/04-process-scoped-state
 github_path: examples/statelessness/04-process-scoped-state
 ---
 
-> The full source for this example lives in [`examples/statelessness/04-process-scoped-state/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/04-process-scoped-state) — clone the repo, `cd` in, and `./demo.sh`.
+> The full source for this example lives in [`examples/statelessness/04-process-scoped-state/`](https://github.com/{{ site.github_username }}/{{ site.github_repo }}/tree/main/examples/statelessness/04-process-scoped-state): clone the repo, `cd` in, and `./demo.sh`.
 
 Compendium reference:
-[Doc 04 — Process-scoped state and the State Architecture Table]({{ '/docs/04-process-scoped-state/' | relative_url }})
+[Doc 04: Process-scoped state and the State Architecture Table]({{ '/docs/04-process-scoped-state/' | relative_url }})
 
 Not all state is request-scoped. A service holds a parsed config, a metrics
-registry, a connection pool, an in-process cache — built once and shared
+registry, a connection pool, an in-process cache: built once and shared
 across every request. Doc 04 calls this *process-scoped* state and argues
 for wiring it in `main()` rather than reaching for singletons. This example
 makes that wiring, and the correct-teardown property that falls out of it,
@@ -26,7 +26,7 @@ visible.
 
 ## Why this matters
 
-Process-scoped state is legitimate — pools and caches and parsed config
+Process-scoped state is legitimate: pools and caches and parsed config
 *should* live for the process. The question is how you own it, and under
 containers the wrong answer is expensive:
 
@@ -41,7 +41,7 @@ containers the wrong answer is expensive:
 - **Teardown order matters and should be free.** A service that tears down
   its connection pool before the server that's still using it crashes on
   shutdown. Constructing dependencies before their users means RAII
-  destroys them in the correct reverse order automatically — no shutdown
+  destroys them in the correct reverse order automatically: no shutdown
   choreography to get wrong.
 
 ## What this demo shows
@@ -62,15 +62,15 @@ order. No Meyers singletons, no hidden construction order.
 constructor parameters. `main()` owns them; the service borrows them.
 
 **Correct teardown, automatically.** Dependencies are constructed before their
-users, so RAII destroys them in the exact reverse order at exit —
-`server → service → cache → metrics → config` — which is also the correct
+users, so RAII destroys them in the exact reverse order at exit:
+`server → service → cache → metrics → config`. This is also the correct
 shutdown order (server stops first, then the state it relied on). No manual
 choreography; each destructor logs, so the order is visible when you stop
 the container.
 
 **Bounded state.** The cache is an LRU with a hard capacity
 (`CACHE_CAPACITY`, default 4). Look up more distinct keys than it holds and
-it evicts the least-recently-used entry rather than growing — the sizing
+it evicts the least-recently-used entry rather than growing: the sizing
 discipline Doc 04 stresses.
 
 **Thread-safe shared state** (foreshadows the threading section): the
@@ -95,7 +95,7 @@ CI verification: `scripts/test-stateless-demo-04-process-scoped-state.sh`.
 ## What you'll see
 
 Representative output on a Fedora 44 host with GCC 14 and Docker
-29.x — the build order at startup, an eviction under a capacity of 4, then
+29.x. The output shows the build order at startup, an eviction under a capacity of 4, then
 the reverse-order teardown on stop:
 
 ```
@@ -134,32 +134,32 @@ the reverse-order teardown on stop:
   the correct teardown automatically.
 - **The cache size never exceeds 4.** Once full, every new distinct key
   evicts the least-recently-used one. The `size=4` that holds steady while
-  `evictions` climbs is the bounded-by-construction property — under a
+  `evictions` climbs is the bounded-by-construction property: under a
   memory cgroup that's the line between a predictable eviction and an
   OOMKill.
 - **`a` misses again after eviction.** It was the least-recently-used when
   `e` arrived, so it's gone; looking it up again is a fresh miss. That's the
   LRU policy doing its job, not a bug.
 - **The server destructs first.** On the teardown side the server stops
-  before the cache and config it depended on — so no in-flight RPC can touch
+  before the cache and config it depended on, so no in-flight RPC can touch
   freed state. Reverse-order destruction makes that ordering automatic.
 
 ## Files
 
-- `src/composition.hpp` — `ServiceConfig`, `MetricsRegistry`, and the LRU
+- `src/composition.hpp`: `ServiceConfig`, `MetricsRegistry`, and the LRU
   `BoundedCache` (the process-scoped types)
-- `src/main.cpp` — the composition root, the DI service, and a healthz
-- `src/client.cpp` — one-shot client (`lookup` | `stats`)
-- `proto/state.proto` — `StateService`: `Lookup` + `Stats`
-- `CMakeLists.txt` — svc + client
-- `conanfile.py` — gRPC + protobuf + abseil (no OTel)
-- `Containerfile` — multi-stage UBI 10 → ubi-minimal
-- `compose.yml` — single service; read-only rootfs + tmpfs
-- `demo.sh` — build, bring up, drive lookups + stats, show teardown
+- `src/main.cpp`: the composition root, the DI service, and a healthz
+- `src/client.cpp`: one-shot client (`lookup` | `stats`)
+- `proto/state.proto`: `StateService`: `Lookup` + `Stats`
+- `CMakeLists.txt`: svc + client
+- `conanfile.py`: gRPC + protobuf + abseil (no OTel)
+- `Containerfile`: multi-stage UBI 10 → ubi-minimal
+- `compose.yml`: single service; read-only rootfs + tmpfs
+- `demo.sh`: build, bring up, drive lookups + stats, show teardown
 
 ## Caveats and gotchas
 
-- **Construct dependencies before their users — always.** The reverse-order
+- **Construct dependencies before their users, always.** The reverse-order
   teardown property only holds if construction order is dependency order. If
   you construct the server before the cache it uses, the cache destructs
   first and the server's shutdown touches freed memory.
@@ -170,7 +170,7 @@ the reverse-order teardown on stop:
   not against host RAM.
 - **Shared mutable state needs synchronisation.** gRPC dispatches handlers
   on a thread pool, so the cache takes a mutex and the metrics are atomic.
-  Immutable config needs neither — which is a reason to prefer immutable
+  Immutable config needs neither, which is a reason to prefer immutable
   process-scoped state where you can.
 - **Don't reach for the singleton "just this once."** The moment one
   collaborator is a global, the composition root stops being the single
@@ -182,21 +182,21 @@ the reverse-order teardown on stop:
 This example deepens material from the project's
 [**bibliography**]({{ '/bibliography/' | relative_url }}):
 
-- **Iglberger, *C++ Software Design*, ch. 3-4** — dependency injection and
+- **Iglberger, *C++ Software Design*, ch. 3-4**: dependency injection and
   the case against singletons; the composition-root pattern is this
   section's chapter applied
-- **Andrist & Sehr, *C++ High Performance* 2e, ch. 3** — object lifetime and
+- **Andrist & Sehr, *C++ High Performance* 2e, ch. 3**: object lifetime and
   the reverse-order destruction guarantee the teardown relies on
-- **Enberg, *Latency*, ch. 5** — why bounded, predictable resource use beats
+- **Enberg, *Latency*, ch. 5**: why bounded, predictable resource use beats
   unbounded caching when latency under a hard memory limit is the goal
 
 ## The State Architecture Table, made concrete
 
 | Column | In this example |
 |--------|-----------------|
-| Process-scoped | `ServiceConfig`, `MetricsRegistry`, `BoundedCache` — built in `main()` |
+| Process-scoped | `ServiceConfig`, `MetricsRegistry`, `BoundedCache`: built in `main()` |
 | Request-scoped | per-`Lookup` locals (see [02-raii]({{ '/examples/statelessness-02-raii/' | relative_url }}) and [03-pmr]({{ '/examples/statelessness-03-pmr/' | relative_url }})) |
-| External | the cache-miss path stands in for a DB/Redis fetch — the real thing is [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) |
+| External | the cache-miss path stands in for a DB/Redis fetch: the real thing is [Doc 07]({{ '/docs/07-state-externalization/' | relative_url }}) |
 
 ## Where it sits in the compendium
 
