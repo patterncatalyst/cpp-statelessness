@@ -85,10 +85,10 @@
   <rect class="step step-rel" x="220" y="250" width="480" height="62"/>
   <text x="460" y="270" text-anchor="middle" class="pttl-ok">Request-scoped: ScopedConnection conn{pool}</text>
   <text x="460" y="288" text-anchor="middle" class="step-tm">ctor: checkout · uses · dtor: pool.release(conn)</text>
-  <text x="460" y="304" text-anchor="middle" class="lbl">invalidate() on broken — pool grows a fresh one next checkout</text>
+  <text x="460" y="304" text-anchor="middle" class="lbl">invalidate() on broken: pool grows a fresh one next checkout</text>
 
   <!-- External services (downstream) -->
-  <text x="460" y="350" text-anchor="middle" class="lbl-bd">Authoritative state — survives replica restart, shared across replicas</text>
+  <text x="460" y="350" text-anchor="middle" class="lbl-bd">Authoritative state: survives replica restart, shared across replicas</text>
 
   <rect class="step step-ext" x="30" y="370" width="200" height="92"/>
   <text x="130" y="392" text-anchor="middle" class="pttl">Postgres</text>

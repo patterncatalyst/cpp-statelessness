@@ -89,11 +89,11 @@
   <text x="50" y="345" class="lbl-bd">End of handler</text>
   <rect class="step step-leak" x="50" y="355" width="380" height="62"/>
   <text x="240" y="377" text-anchor="middle" class="step-tm">delete row1; delete row2; ...</text>
-  <text x="240" y="397" text-anchor="middle" class="step-tm">N free() calls — or worse, you forget</text>
-  <text x="240" y="413" text-anchor="middle" class="bad-l">— and leak</text>
+  <text x="240" y="397" text-anchor="middle" class="step-tm">N free() calls: or worse, you forget</text>
+  <text x="240" y="413" text-anchor="middle" class="bad-l">:  and leak</text>
 
   <text x="240" y="448" text-anchor="middle" class="bad-l">Costs: N × malloc/free · pointer-chasing · fragmentation</text>
-  <text x="240" y="466" text-anchor="middle" class="bad-l">Lifetime: per-object, ad-hoc — easy to mismanage</text>
+  <text x="240" y="466" text-anchor="middle" class="bad-l">Lifetime: per-object, ad-hoc: easy to mismanage</text>
 
   <!-- RIGHT: PMR arena -->
   <rect class="panel-ok" x="470" y="80" width="420" height="400"/>
@@ -104,7 +104,7 @@
   <text x="680" y="163" text-anchor="middle" class="step-tm">std::pmr::monotonic_buffer_resource arena{</text>
   <text x="680" y="180" text-anchor="middle" class="step-tm">&amp;backing_buf, 64*1024};</text>
 
-  <text x="490" y="210" class="lbl-bd">Handler body — allocations grow within the arena</text>
+  <text x="490" y="210" class="lbl-bd">Handler body: allocations grow within the arena</text>
 
   <!-- arena visualization: stacked allocations -->
   <rect class="step" x="490" y="220" width="380" height="155"/>

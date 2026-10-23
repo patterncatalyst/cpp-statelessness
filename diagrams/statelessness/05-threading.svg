@@ -64,12 +64,12 @@
   <rect width="920" height="480" fill="url(#grid)"/>
 
   <text x="460" y="34" text-anchor="middle" class="ttl">Threading in a cgroup-constrained service</text>
-  <text x="460" y="54" text-anchor="middle" class="cap">The container's CPU quota — not the host's CPU count — bounds the worker pool</text>
+  <text x="460" y="54" text-anchor="middle" class="cap">The container's CPU quota: not the host's CPU count: bounds the worker pool</text>
 
   <!-- cgroup outer box -->
   <rect class="panel-acc" x="50" y="80" width="820" height="380"/>
   <text x="460" y="106" text-anchor="middle" class="pttl-acc">cgroup v2 slice: cpu.max = "200000 100000"  (≈ 2 CPUs)</text>
-  <text x="460" y="122" text-anchor="middle" class="lbl">Detected via /sys/fs/cgroup/cpu.max — NOT std::thread::hardware_concurrency()</text>
+  <text x="460" y="122" text-anchor="middle" class="lbl">Detected via /sys/fs/cgroup/cpu.max: NOT std::thread::hardware_concurrency()</text>
 
   <!-- inbound RPCs -->
   <rect class="step step-acq" x="80" y="155" width="200" height="55"/>
@@ -81,7 +81,7 @@
   <!-- gRPC server scheduling box -->
   <rect class="step" x="330" y="145" width="510" height="76"/>
   <text x="585" y="167" text-anchor="middle" class="step-t">grpc::Server completion-queue dispatch</text>
-  <text x="585" y="185" text-anchor="middle" class="lbl">ResourceQuota — explicit cap on max threads (default unbounded!)</text>
+  <text x="585" y="185" text-anchor="middle" class="lbl">ResourceQuota: explicit cap on max threads (default unbounded!)</text>
   <text x="585" y="206" text-anchor="middle" class="lbl-bd">ResourceQuota::SetMaxThreads(2)</text>
 
   <!-- worker threads -->
@@ -92,7 +92,7 @@
   <text x="170" y="320" text-anchor="middle" class="step-tm">RequestContext ctx;</text>
   <text x="170" y="338" text-anchor="middle" class="step-tm">// throws? RAII fires.</text>
   <text x="170" y="362" text-anchor="middle" class="lbl">stack: 8 MiB</text>
-  <text x="170" y="378" text-anchor="middle" class="lbl">co_await OK — but no</text>
+  <text x="170" y="378" text-anchor="middle" class="lbl">co_await OK: but no</text>
   <text x="170" y="394" text-anchor="middle" class="lbl">TLS across await points</text>
   <text x="170" y="414" text-anchor="middle" class="ok-l">cooperative cancellation</text>
 
@@ -104,7 +104,7 @@
   <text x="370" y="362" text-anchor="middle" class="lbl">stack: 8 MiB</text>
   <text x="370" y="378" text-anchor="middle" class="lbl">PMR upstream is</text>
   <text x="370" y="394" text-anchor="middle" class="lbl">unsynchronized_pool</text>
-  <text x="370" y="414" text-anchor="middle" class="ok-l">— per thread</text>
+  <text x="370" y="414" text-anchor="middle" class="ok-l">:  per thread</text>
 
   <!-- shutdown signaling -->
   <rect class="step step-leak" x="500" y="262" width="340" height="78"/>
@@ -117,8 +117,8 @@
   <text x="670" y="370" text-anchor="middle" class="pttl">std::stop_token in handlers</text>
   <text x="670" y="388" text-anchor="middle" class="step-tm">if (token.stop_requested()) ...</text>
   <text x="670" y="404" text-anchor="middle" class="lbl">Polite: finish current step, return Status::CANCELLED</text>
-  <text x="670" y="418" text-anchor="middle" class="lbl">— don't start new long work</text>
+  <text x="670" y="418" text-anchor="middle" class="lbl">:  don't start new long work</text>
 
   <!-- footer caption -->
-  <text x="460" y="450" text-anchor="middle" class="cap">CPU quota throttles tail latency under load — size the worker pool to match.</text>
+  <text x="460" y="450" text-anchor="middle" class="cap">CPU quota throttles tail latency under load: size the worker pool to match.</text>
 </svg>

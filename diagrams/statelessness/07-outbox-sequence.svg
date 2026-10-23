@@ -16,7 +16,7 @@
   </defs>
   <rect width="980" height="620" fill="#fdfbf7"/>
   <rect width="980" height="620" fill="url(#grid)" opacity="0.4"/>
-  <text x="490" y="30" text-anchor="middle" style="font: 700 16px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Outbox pattern — atomic write, relay, idempotent consumer</text>
+  <text x="490" y="30" text-anchor="middle" style="font: 700 16px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Outbox pattern: atomic write, relay, idempotent consumer</text>
   <rect x="28" y="64" width="124" height="34" rx="6" ry="6" fill="#e8f0fb" stroke="#4a73b8" stroke-width="1.5"/>
   <text x="90" y="84" text-anchor="middle" style="font: 700 13px -apple-system, system-ui, 'Segoe UI', sans-serif; fill: #1a1a1a;">Client</text>
   <line x1="90" y1="98" x2="90" y2="560" stroke="#cdbfa6" stroke-width="1.0" stroke-dasharray="4 4"/>

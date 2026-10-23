@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 485" role="img"
-     aria-label="The ephemeral filesystem trap: layered overlayfs with writable upperdir, tmpfs, read-only image layers, and persistent volumes — what survives a restart and what doesn't">
+     aria-label="The ephemeral filesystem trap: layered overlayfs with writable upperdir, tmpfs, read-only image layers, and persistent volumes: what survives a restart and what doesn't">
   <defs>
     <style><![CDATA[
       .bg       { fill: #fdfbf7; }
@@ -117,7 +117,7 @@
 
   <rect class="step step-leak" x="610" y="304" width="260" height="50"/>
   <text x="740" y="322" text-anchor="middle" class="pttl-bad">prometheus_cpp textfile</text>
-  <text x="740" y="340" text-anchor="middle" class="lbl">file-based exporter — wrong model</text>
+  <text x="740" y="340" text-anchor="middle" class="lbl">file-based exporter: wrong model</text>
 
   <rect class="step step-leak" x="610" y="362" width="260" height="50"/>
   <text x="740" y="380" text-anchor="middle" class="pttl-bad">ML model cache</text>

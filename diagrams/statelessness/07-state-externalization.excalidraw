@@ -11,7 +11,7 @@
             "y": 100,
             "width": 600,
             "height": 40,
-            "text": "Connection pool + ScopedConnection + externalized state — see paired SVG; .excalidraw to be authored",
+            "text": "Connection pool + ScopedConnection + externalized state: see paired SVG; .excalidraw to be authored",
             "fontSize": 24,
             "fontFamily": 1,
             "textAlign": "left",

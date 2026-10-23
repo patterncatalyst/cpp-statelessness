@@ -68,7 +68,7 @@
 
   <!-- LEFT panel: stateless posture -->
   <rect class="panel-ok" x="30" y="80" width="420" height="400"/>
-  <text x="240" y="106" text-anchor="middle" class="pttl-ok">Stateless posture — replicate freely, kill at will</text>
+  <text x="240" y="106" text-anchor="middle" class="pttl-ok">Stateless posture: replicate freely, kill at will</text>
 
   <!-- orchestrator -->
   <rect class="step step-acq" x="60" y="125" width="360" height="36"/>
@@ -114,7 +114,7 @@
 
   <!-- RIGHT panel: stateful posture -->
   <rect class="panel-bad" x="470" y="80" width="420" height="400"/>
-  <text x="680" y="106" text-anchor="middle" class="pttl-bad">Stateful posture — kill carries cost</text>
+  <text x="680" y="106" text-anchor="middle" class="pttl-bad">Stateful posture: kill carries cost</text>
 
   <rect class="step step-acq" x="500" y="125" width="360" height="36"/>
   <text x="680" y="148" text-anchor="middle" class="step-t">Orchestrator (must remember which is which)</text>
@@ -136,10 +136,10 @@
   <!-- properties list -->
   <text x="490" y="345" class="lbl-bd">If the orchestrator kills this:</text>
   <text x="490" y="364" class="lbl">• carts lost · users re-login</text>
-  <text x="490" y="382" class="lbl">• cache cold — backend stampede</text>
+  <text x="490" y="382" class="lbl">• cache cold: backend stampede</text>
   <text x="490" y="400" class="lbl">• in-flight requests fail</text>
   <text x="490" y="418" class="lbl">• new replicas must "catch up"</text>
-  <text x="490" y="441" class="bad-l">Same binary — different state choices.</text>
+  <text x="490" y="441" class="bad-l">Same binary: different state choices.</text>
   <text x="490" y="459" class="bad-l">Posture decided by what's in memory,</text>
   <text x="490" y="477" class="bad-l">not by the language.</text>
 </svg>
